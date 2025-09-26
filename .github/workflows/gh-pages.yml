@@ -36,5 +36,5 @@ jobs:
         if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
         with:
           commit_message: ${{ github.event.head_commit.message }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH-PAGES-MYRIAD }}
           publish_dir: ./docs/public
