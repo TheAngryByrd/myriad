@@ -22,8 +22,7 @@
   <Target Name="Pack" DependsOnTargets="Clean;Restore;Test">
     <!-- pack sdk then whole sln -->
     <Exec Command='dotnet pack src/Myriad.Sdk/Myriad.Sdk.proj -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
-    <Exec Command='dotnet pack src/Myriad.sln -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />           
-    <Exec Command='dotnet mergenupkg --source "$(NupkgsDir)/Myriad.Sdk.$(Version).nupkg" --other "$(NupkgsDir)/Myriad.$(Version).nupkg" --tools --only-files' />
+    <Exec Command='dotnet pack src/Myriad.sln -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
   </Target>
 
 </Project>
