@@ -1,5 +1,7 @@
 # Myriad
 
+[![Documentation](https://img.shields.io/badge/docs-github%20pages-blue)](https://moiraesoftware.github.io/Myriad/)
+
 Myriad is a code generator. It takes input from files or data sources and the library provides different mechanisms to allow F# code to be produced in response to the file, whether that file be an F# source file or a simple text file.  
 
 Myriad can be used from either an MSBuild extension or from its CLI tool.
