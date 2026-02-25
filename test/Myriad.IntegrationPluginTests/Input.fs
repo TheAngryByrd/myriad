@@ -76,3 +76,11 @@ type AetherPerson = {
     Name : string
     Address : AetherAddress
 }
+
+// Type that uses F# 8 _.property shorthand syntax in a member
+[<Generator.Lenses("lens")>]
+type RecordWithDotLambdaMember = {
+    count: int
+    value: string
+} with
+    member self.upperValues = [ self.value ] |> List.map _.ToUpper()

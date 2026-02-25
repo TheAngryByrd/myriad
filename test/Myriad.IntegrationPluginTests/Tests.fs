@@ -148,5 +148,31 @@ let tests =
                 let value =  Aether.Optic.get AetherTestLens.AetherPersonLenses.Address updated
                 Expect.equal value { Street = "Baker st."; HouseNumber = 222 } "Sets the address lens via Aether"
             }
+
+            testList "F# 8 dot lambda syntax" [
+                let r = { RecordWithDotLambdaMember.count = 42; value = "hello" }
+
+                test "Getter works for record with dot lambda member" {
+                    let getter = fst TestLens.RecordWithDotLambdaMemberLenses.count
+                    Expect.equal 42 (getter r) "getter returns the count value"
+                }
+
+                test "Setter works for record with dot lambda member" {
+                    let setter = snd TestLens.RecordWithDotLambdaMemberLenses.count
+                    let updated = setter r 99
+                    Expect.equal 99 updated.count "setter updates the count value"
+                }
+
+                test "String field getter works for record with dot lambda member" {
+                    let getter = fst TestLens.RecordWithDotLambdaMemberLenses.value
+                    Expect.equal "hello" (getter r) "getter returns the string value"
+                }
+
+                test "String field setter works for record with dot lambda member" {
+                    let setter = snd TestLens.RecordWithDotLambdaMemberLenses.value
+                    let updated = setter r "world"
+                    Expect.equal "world" updated.value "setter updates the string value"
+                }
+            ]
         ]
     ]
