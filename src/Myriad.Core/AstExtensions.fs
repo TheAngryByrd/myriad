@@ -193,7 +193,7 @@ module AstExtensions =
 
     type SynType with
         static member CreateApp (typ, args, ?isPostfix) =
-            SynType.App(typ, None, args, dotsOrCommas args, None, (defaultArg isPostfix false), range0)
+            SynType.App(typ, Some range0, args, dotsOrCommas args, Some range0, (defaultArg isPostfix false), range0)
         static member CreateLongIdent id =
             SynType.LongIdent(id)
         static member CreateLongIdent s =
