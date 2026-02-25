@@ -11,9 +11,7 @@ module internal Create =
         let (SynField.SynField(_,_,id,_,_,_,_,_,_)) = field
         let fieldName = match id with None -> failwith "no field name" | Some f -> f
 
-        let recordType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let recordType = SynType.CreateFromLongIdent parent
 
         let varName = "x"
         let pattern =
@@ -39,9 +37,7 @@ module internal Create =
     let createCreate (parent: LongIdent) (fields: SynField list) =
         let varIdent = SynLongIdent.CreateString "create"
 
-        let recordType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let recordType = SynType.CreateFromLongIdent parent
 
         let pattern =
             let arguments =

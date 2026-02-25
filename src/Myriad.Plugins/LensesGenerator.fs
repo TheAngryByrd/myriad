@@ -20,9 +20,7 @@ module internal CreateLenses =
         let (SynField.SynField(_,_,id,fieldType,_,_,_,_,_)) = field
         let fieldName = match id with None -> failwith "no field name" | Some f -> f
 
-        let recordType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let recordType = SynType.CreateFromLongIdent parent
                     
         let letPat = SynPat.CreateNamed fieldName
         let lambdaGetBody = SynExpr.CreateLongIdent(SynLongIdent.Create ["x"; fieldName.idText])
@@ -61,9 +59,7 @@ module internal CreateLenses =
             | SynUnionCaseKind.Fields (_ :: _) -> failwith "It is not possible to create a lens for a DU with several cases"
             | _ -> failwithf "Unsupported type"
 
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let duType = SynType.CreateFromLongIdent parent
 
         let getterName = Ident("getter", range0)
         let pattern =
@@ -99,9 +95,7 @@ module internal CreateLenses =
 
                 let valueArgPatterns = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed valueIdent, fieldType))]
 
-                let duType =
-                    SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-                    |> SynType.CreateLongIdent
+                let duType = SynType.CreateFromLongIdent parent
 
                 let createCase = SynExpr.App (ExprAtomicFlag.NonAtomic, false, SynExpr.LongIdent (false, fullCaseName, None, range0), SynExpr.Ident valueIdent, range0)
                 

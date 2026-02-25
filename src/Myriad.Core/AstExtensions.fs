@@ -198,6 +198,9 @@ module AstExtensions =
             SynType.LongIdent(id)
         static member CreateLongIdent s =
             SynType.CreateLongIdent(SynLongIdent.CreateString s)
+        static member CreateFromLongIdent (parent: LongIdent) =
+            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
+            |> SynType.CreateLongIdent
         static member CreateUnit =
             SynType.CreateLongIdent("unit")
         static member CreateFun (fieldTypeIn, fieldTypeOut) =

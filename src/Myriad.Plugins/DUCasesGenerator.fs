@@ -12,9 +12,7 @@ module internal CreateDUModule =
         let varIdent = SynLongIdent.CreateString "toString"
         let inputIdent = "x"
 
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let duType = SynType.CreateFromLongIdent parent
 
         let pattern =
             let ident = Ident(inputIdent, range0)
@@ -52,9 +50,7 @@ module internal CreateDUModule =
         let varIdent = SynLongIdent.CreateString "fromString"
         let inputIdent = "x"
 
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let duType = SynType.CreateFromLongIdent parent
 
         let inputType =
             SynLongIdent.CreateString "string"
@@ -103,9 +99,7 @@ module internal CreateDUModule =
         let varIdent = SynLongIdent.CreateString "toTag"
         let inputIdent = "x"
 
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let duType = SynType.CreateFromLongIdent parent
 
         let pattern =
             let ident = Ident(inputIdent, range0)
@@ -144,9 +138,7 @@ module internal CreateDUModule =
             let varIdent = SynLongIdent.CreateString $"is%s{id.idText}"
             let inputIdent = "x"
 
-            let duType =
-                SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-                |> SynType.CreateLongIdent
+            let duType = SynType.CreateFromLongIdent parent
 
             let pattern =
                 let ident = Ident(inputIdent, range0)
