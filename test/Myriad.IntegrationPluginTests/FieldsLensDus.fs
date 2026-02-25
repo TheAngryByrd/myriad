@@ -105,6 +105,18 @@ module AetherPersonLenses =
         (fun (value: AetherAddress) (x: AetherPerson) -> { x with Address = value })
 namespace rec TestLens
 
+module RecordWithDotLambdaMemberLenses =
+    open Input
+
+    let count =
+        (fun (x: RecordWithDotLambdaMember) -> x.count),
+        (fun (x: RecordWithDotLambdaMember) (value: int) -> { x with count = value })
+
+    let value =
+        (fun (x: RecordWithDotLambdaMember) -> x.value),
+        (fun (x: RecordWithDotLambdaMember) (value: string) -> { x with value = value })
+namespace rec TestLens
+
 module SingleCaseDULenses =
     open Input
 
