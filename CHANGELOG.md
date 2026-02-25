@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- `SynType.CreateFromLongIdent` helper in `Myriad.Core.AstExtensions`. Plugin authors can now convert a `LongIdent` to a `SynType` using this single convenience method instead of manually chaining `SynLongIdent.Create` and `SynType.CreateLongIdent`.
+
+  ```fsharp
+  static member CreateFromLongIdent (parent: LongIdent) =
+      SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
+      |> SynType.CreateLongIdent
+  ```
+
 ## [0.8.4]
 ## Changed
 - Upgraded to net9.0
