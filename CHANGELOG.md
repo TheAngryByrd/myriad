@@ -8,10 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `SynType.CreateFromLongIdent` helper in `Myriad.Core.AstExtensions`. Plugin authors can now convert a `LongIdent` to a `SynType` using this single convenience method instead of manually chaining `SynLongIdent.Create` and `SynType.CreateLongIdent`.
 
+### Fixed
+- Myriad now correctly processes input files that contain F# 8 dot-lambda (`_.property`) shorthand syntax. Previously, types using `_.` in `with member` bodies would cause a parse error:
+
+  ```
+  Fantomas.Core.ParseException: Unexpected symbol '_' in expression
+  ```
+
+  This was resolved by upgrading `Fantomas.Core` and `Fantomas.FCS` from `7.0.0` to `7.0.5`, which includes full support for `SynExpr.DotLambda`. For example, the following now works correctly:
+
   ```fsharp
-  static member CreateFromLongIdent (parent: LongIdent) =
-      SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-      |> SynType.CreateLongIdent
+  type MyType = {
+      items: MyItem list
+  } with
+      member self.itemIds = self.items |> List.map _.id
   ```
 
 ## [0.8.4]
