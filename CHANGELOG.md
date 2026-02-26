@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Custom plugins built against a different target framework than the Myriad tool no longer fail with `System.Reflection.ReflectionTypeLoadException`. The plugin loader now sets `PreferSharedTypes = true` so that assemblies already loaded by the host (such as `FSharp.Core` and `Fantomas.FCS`) are shared with the plugin instead of being loaded again from the plugin's output directory. Type load failures are also handled gracefully so that generators that do load are not lost.
+
 ### Added
 - `SynType.CreateFromLongIdent` helper in `Myriad.Core.AstExtensions`. Plugin authors can now convert a `LongIdent` to a `SynType` using this single convenience method instead of manually chaining `SynLongIdent.Create` and `SynType.CreateLongIdent`.
 
