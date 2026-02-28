@@ -65,3 +65,12 @@ In your testing `fsproj` you would add the following to allow the plugin to be u
 ```xml
 <!-- include plugin -->
 <Import Project="<Path to Generator plugin location>\build\Myriad.Plugins.InTest.props" />
+```
+
+## Framework Compatibility
+
+Myriad supports loading plugins built against a **different target framework** than the Myriad tool itself. For example, a plugin targeting `net8.0` can be loaded by the `net9.0` Myriad tool without errors.
+
+The plugin loader uses `PreferSharedTypes = true`, which means assemblies already loaded by the Myriad host — such as `FSharp.Core` and `Fantomas.FCS` — are shared with the plugin rather than loaded again from the plugin's output directory. This prevents `System.Reflection.ReflectionTypeLoadException` that would otherwise occur due to type identity mismatches across `AssemblyLoadContext` boundaries.
+
+> **Note:** While cross-framework plugin loading is supported, it is still recommended to target the same framework version as the Myriad tool for the most predictable behaviour.
