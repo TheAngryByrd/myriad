@@ -7,6 +7,185 @@ open Example
 open Example.Lens
 open Input
 open UnknownNamespace
+open Fantomas.FCS.Syntax
+open Myriad.Core
+
+let private parseSource (source: string) =
+    Fantomas.Core.CodeFormatter.ParseAsync(false, source)
+    |> Async.RunSynchronously
+    |> Array.head
+    |> fst
+
+let literalBindingTests =
+    testList "Literal binding tests" [
+        test "extractLiteralBindings returns string literal" {
+            let source = """module A =
+    let [<Literal>] MyConst = "Hello"
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            Expect.equal bindings.Count 1 "should have one literal binding"
+            match bindings.TryFind "MyConst" with
+            | Some(SynConst.String(text, _, _)) ->
+                Expect.equal text "Hello" "literal value should be 'Hello'"
+            | _ -> failwith "Expected string literal binding for MyConst"
+        }
+
+        test "extractLiteralBindings ignores non-literal bindings" {
+            let source = """module A =
+    let nonLiteral = "Hello"
+    let [<Literal>] OnlyLiteral = "World"
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            Expect.equal bindings.Count 1 "should have only one literal binding"
+            Expect.isNone (bindings.TryFind "nonLiteral") "non-literal should not be in bindings"
+            Expect.isSome (bindings.TryFind "OnlyLiteral") "literal should be in bindings"
+        }
+
+        test "extractLiteralBindings finds literals in nested modules" {
+            let source = """module Outer =
+    module Inner =
+        let [<Literal>] NestedConst = "Nested"
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            Expect.isSome (bindings.TryFind "NestedConst") "literal in nested module should be found"
+        }
+
+        test "extractLiteralBindings returns integer literal" {
+            let source = """module A =
+    let [<Literal>] MyInt = 42
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            match bindings.TryFind "MyInt" with
+            | Some(SynConst.Int32 42) -> ()
+            | _ -> failwith "Expected Int32 literal binding for MyInt"
+        }
+
+        test "getAttributeConstantsWithBindings resolves ident to string" {
+            let source = """module A =
+    let [<Literal>] MyConst = "fields"
+    [<Generator.Fields(MyConst)>]
+    type MyRecord = { Value: int }
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            let typeDefs = Ast.extractTypeDefn ast
+            let attrib =
+                typeDefs
+                |> List.collect snd
+                |> List.tryPick (fun td -> Ast.getAttribute<Myriad.Plugins.Generator.FieldsAttribute> td)
+                |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
+            let constants = Ast.getAttributeConstantsWithBindings bindings attrib
+            Expect.equal constants ["fields"] "should resolve MyConst to 'fields'"
+        }
+
+        test "getAttributeConstantsWithBindings falls back to direct string constant" {
+            let source = """module A =
+    [<Generator.Fields "lens">]
+    type MyRecord = { Value: int }
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            let typeDefs = Ast.extractTypeDefn ast
+            let attrib =
+                typeDefs
+                |> List.collect snd
+                |> List.tryPick (fun td -> Ast.getAttribute<Myriad.Plugins.Generator.FieldsAttribute> td)
+                |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
+            let constants = Ast.getAttributeConstantsWithBindings bindings attrib
+            Expect.equal constants ["lens"] "should return direct string constant"
+        }
+
+        test "getAttributeConstantsWithBindings returns empty for unresolved ident" {
+            let source = """module A =
+    [<Generator.Fields(UnknownIdent)>]
+    type MyRecord = { Value: int }
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            let typeDefs = Ast.extractTypeDefn ast
+            let attrib =
+                typeDefs
+                |> List.collect snd
+                |> List.tryPick (fun td -> Ast.getAttribute<Myriad.Plugins.Generator.FieldsAttribute> td)
+                |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
+            let constants = Ast.getAttributeConstantsWithBindings bindings attrib
+            Expect.equal constants [] "should return empty list for unresolved ident"
+        }
+    ]
+
+let editorConfigTests =
+    testList "EditorConfig" [
+        test "readConfiguration returns FormatConfig.Default when no .editorconfig exists" {
+            // Use a path in a temp directory that has no .editorconfig
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_noconfig_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                let testFile = Path.Combine(tmpDir, "test.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.IndentSize Fantomas.Core.FormatConfig.Default.IndentSize "IndentSize should match default"
+                Expect.equal cfg.MaxLineLength Fantomas.Core.FormatConfig.Default.MaxLineLength "MaxLineLength should match default"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration applies indent_size from .editorconfig" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_indent_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nindent_size = 2\n")
+                let testFile = Path.Combine(tmpDir, "Output.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.IndentSize 2 "IndentSize should be 2 as per .editorconfig"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration applies max_line_length from .editorconfig" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_linelen_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nmax_line_length = 80\n")
+                let testFile = Path.Combine(tmpDir, "Output.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.MaxLineLength 80 "MaxLineLength should be 80 as per .editorconfig"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration applies fsharp-specific settings from .editorconfig" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_fsharp_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nfsharp_space_before_colon = true\n")
+                let testFile = Path.Combine(tmpDir, "Output.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.isTrue cfg.SpaceBeforeColon "SpaceBeforeColon should be true as per .editorconfig"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration respects .editorconfig glob patterns - only applies to .fs files" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_glob_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                // indent_size = 2 only applies to .fs files, not .fsi
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nindent_size = 2\n")
+                let testFile = Path.Combine(tmpDir, "Output.fsi")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.IndentSize Fantomas.Core.FormatConfig.Default.IndentSize "IndentSize should be default for .fsi file"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+    ]
 
 let editorConfigTests =
     testList "EditorConfig" [
@@ -253,4 +432,6 @@ let tests =
                 }
             ]
         ]
+
+        literalBindingTests
     ]

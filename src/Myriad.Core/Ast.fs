@@ -124,6 +124,61 @@ module Ast =
         | StringConst text -> [text]
         | _ -> []
 
+    /// Extracts all [&lt;Literal&gt;] bindings from the parsed AST into a map from identifier name to constant value.
+    /// This can be used with getAttributeConstantsWithBindings to resolve identifier references in attribute arguments.
+    let extractLiteralBindings (ast: ParsedInput) : Map<string, SynConst> =
+        let isLiteralAttribute (attrib: SynAttribute) =
+            match attrib.TypeName with
+            | SynLongIdent([id], _, _) ->
+                let name = id.idText
+                name = "Literal" || name = "LiteralAttribute"
+            | _ -> false
+
+        let rec extractFromDecls (decls: SynModuleDecl list) =
+            [ for decl in decls do
+                match decl with
+                | SynModuleDecl.Let(_, bindings, _) ->
+                    for SynBinding.SynBinding(_, _, _, _, attributes, _, _, headPat, _, expr, _, _, _) in bindings do
+                        let hasLiteralAttr =
+                            attributes
+                            |> List.collect (fun al -> al.Attributes)
+                            |> List.exists isLiteralAttribute
+                        if hasLiteralAttr then
+                            // Match simple identifier bindings (e.g. `let [<Literal>] Name = value`)
+                            // In the parsed AST these use SynPat.LongIdent with a single identifier and no arguments
+                            match headPat, expr with
+                            | SynPat.LongIdent(SynLongIdent([id], _, _), None, None, SynArgPats.Pats [], None, _), SynExpr.Const(c, _) ->
+                                yield id.idText, c
+                            | _ -> ()
+                | SynModuleDecl.NestedModule(_, _, decls, _, _, _) ->
+                    yield! extractFromDecls decls
+                | _ -> () ]
+
+        [ match ast with
+          | ParsedInput.ImplFile(ParsedImplFileInput(_, _, _, _, _, modules, _, _, _)) ->
+              for SynModuleOrNamespace(_, _, _, moduleDecls, _, _, _, _, _) in modules do
+                  yield! extractFromDecls moduleDecls
+          | _ -> () ]
+        |> Map.ofList
+
+    /// Gets the string constants from an attribute, resolving any simple identifier references using
+    /// the provided literal bindings map (as returned by extractLiteralBindings).
+    /// This extends getAttributeConstants to support [&lt;Literal&gt;]-attributed identifiers as attribute arguments.
+    let getAttributeConstantsWithBindings (bindings: Map<string, SynConst>) (attrib: SynAttribute) =
+        let (|StringConst|_|) = function
+            | SynExpr.Const(SynConst.String(text, _, _), _) -> Some text
+            | SynExpr.Ident id ->
+                match bindings.TryFind id.idText with
+                | Some(SynConst.String(text, _, _)) -> Some text
+                | _ -> None
+            | _ -> None
+
+        match attrib.ArgExpr with
+        | SynExpr.Paren(StringConst text, _, _, _) -> [text]
+        | SynExpr.Paren(SynExpr.Tuple(_, entries, _, _), _, _, _) -> entries |> List.choose (|StringConst|_|)
+        | StringConst text -> [text]
+        | _ -> []
+
     let hasAttributeWithConst (attributeType: Type) (attributeArg: string) (attrib: SynAttribute) =
 
         let argumentMatched attributeArg =
