@@ -5,6 +5,115 @@ open Example
 open Example.Lens
 open Input
 open UnknownNamespace
+open Fantomas.FCS.Syntax
+open Myriad.Core
+
+let private parseSource (source: string) =
+    Fantomas.Core.CodeFormatter.ParseAsync(false, source)
+    |> Async.RunSynchronously
+    |> Array.head
+    |> fst
+
+let literalBindingTests =
+    testList "Literal binding tests" [
+        test "extractLiteralBindings returns string literal" {
+            let source = """module A =
+    let [<Literal>] MyConst = "Hello"
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            Expect.equal bindings.Count 1 "should have one literal binding"
+            match bindings.TryFind "MyConst" with
+            | Some(SynConst.String(text, _, _)) ->
+                Expect.equal text "Hello" "literal value should be 'Hello'"
+            | _ -> failwith "Expected string literal binding for MyConst"
+        }
+
+        test "extractLiteralBindings ignores non-literal bindings" {
+            let source = """module A =
+    let nonLiteral = "Hello"
+    let [<Literal>] OnlyLiteral = "World"
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            Expect.equal bindings.Count 1 "should have only one literal binding"
+            Expect.isNone (bindings.TryFind "nonLiteral") "non-literal should not be in bindings"
+            Expect.isSome (bindings.TryFind "OnlyLiteral") "literal should be in bindings"
+        }
+
+        test "extractLiteralBindings finds literals in nested modules" {
+            let source = """module Outer =
+    module Inner =
+        let [<Literal>] NestedConst = "Nested"
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            Expect.isSome (bindings.TryFind "NestedConst") "literal in nested module should be found"
+        }
+
+        test "extractLiteralBindings returns integer literal" {
+            let source = """module A =
+    let [<Literal>] MyInt = 42
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            match bindings.TryFind "MyInt" with
+            | Some(SynConst.Int32 42) -> ()
+            | _ -> failwith "Expected Int32 literal binding for MyInt"
+        }
+
+        test "getAttributeConstantsWithBindings resolves ident to string" {
+            let source = """module A =
+    let [<Literal>] MyConst = "fields"
+    [<Generator.Fields(MyConst)>]
+    type MyRecord = { Value: int }
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            let typeDefs = Ast.extractTypeDefn ast
+            let attrib =
+                typeDefs
+                |> List.collect snd
+                |> List.tryPick (fun td -> Ast.getAttribute<Myriad.Plugins.Generator.FieldsAttribute> td)
+                |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
+            let constants = Ast.getAttributeConstantsWithBindings bindings attrib
+            Expect.equal constants ["fields"] "should resolve MyConst to 'fields'"
+        }
+
+        test "getAttributeConstantsWithBindings falls back to direct string constant" {
+            let source = """module A =
+    [<Generator.Fields "lens">]
+    type MyRecord = { Value: int }
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            let typeDefs = Ast.extractTypeDefn ast
+            let attrib =
+                typeDefs
+                |> List.collect snd
+                |> List.tryPick (fun td -> Ast.getAttribute<Myriad.Plugins.Generator.FieldsAttribute> td)
+                |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
+            let constants = Ast.getAttributeConstantsWithBindings bindings attrib
+            Expect.equal constants ["lens"] "should return direct string constant"
+        }
+
+        test "getAttributeConstantsWithBindings returns empty for unresolved ident" {
+            let source = """module A =
+    [<Generator.Fields(UnknownIdent)>]
+    type MyRecord = { Value: int }
+"""
+            let ast = parseSource source
+            let bindings = Ast.extractLiteralBindings ast
+            let typeDefs = Ast.extractTypeDefn ast
+            let attrib =
+                typeDefs
+                |> List.collect snd
+                |> List.tryPick (fun td -> Ast.getAttribute<Myriad.Plugins.Generator.FieldsAttribute> td)
+                |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
+            let constants = Ast.getAttributeConstantsWithBindings bindings attrib
+            Expect.equal constants [] "should return empty list for unresolved ident"
+        }
+    ]
 
 let tests =
     testList "basic tests" [
