@@ -362,4 +362,6 @@ let tests =
                 }
             ]
         ]
+
+        literalBindingTests
     ]
