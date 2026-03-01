@@ -192,13 +192,13 @@ module Main =
                 |> List.map (runGenerator inputFile)
 
             let formattedCode =
-                let cfg = FormatConfig.Default
-
                 let outputCode =
                     let filename =
                         if inlineGeneration then inputFile
                         else if outputFile.IsSome then outputFile.Value
                         else failwith "Error: No OutputFile was included, and --selfgeneration was not specified."
+
+                    let cfg = Myriad.Core.EditorConfig.readConfiguration filename
 
                     generated
                     |> List.map (fun (genType, output, errors) ->

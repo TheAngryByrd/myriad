@@ -7,6 +7,7 @@ NUGET
     Argu (6.2.5)
       FSharp.Core (>= 6.0)
       System.Configuration.ConfigurationManager (>= 4.4)
+    editorconfig (0.15)
     Expecto (10.2.1)
       FSharp.Core (>= 7.0.200)
       Mono.Cecil (>= 0.11.4 < 1.0)
