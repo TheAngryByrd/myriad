@@ -188,21 +188,22 @@ type LensesGenerator() =
                 |> Async.RunSynchronously
                 |> Array.head
 
-            let processTypeDefns extractFn =
-                extractFn ast
-                |> List.collect (fun (ns, typeDefns) ->
-                    typeDefns
+            let processTypeList namespaceAndTypes =
+                namespaceAndTypes
+                |> List.collect (
+                    fun (ns, types) ->
+                    types
                     |> List.choose (fun t ->
-                        Ast.getAttribute<Generator.LensesAttribute> t
-                        |> Option.map (fun a -> t, a))
+                        let attr = Ast.getAttribute<Generator.LensesAttribute> t
+                        Option.map (fun a -> t, a) attr)
                     |> List.map (fun (typeDefn, attrib) ->
                         let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter typeDefn
-                        let lensNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+                        let typeNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
                         let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
                         let synModule = CreateLenses.createLensModule ns typeDefn attrib usePipedSetter
-                        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong lensNamespace, isRecursive = true, decls = [synModule])))
+                        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong typeNamespace, isRecursive = true, decls = [synModule])))
 
-            let recordsModules = processTypeDefns Ast.extractRecords
-            let duModules = processTypeDefns Ast.extractDU
+            let recordsModules = processTypeList (Ast.extractRecords ast)
+            let duModules = processTypeList (Ast.extractDU ast)
 
             Output.Ast [yield! recordsModules; yield! duModules]
