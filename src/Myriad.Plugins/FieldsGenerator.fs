@@ -94,10 +94,6 @@ module internal Create =
             SynPat.CreateLongIdent(varIdent, allArgs)
 
         let expr =
-            let copyInfo =
-                let blockSep = (range0, None) : BlockSeparator
-                Some (SynExpr.CreateIdent recordPrimeIdent, blockSep)
-
             let fieldUpdates =
                 let mapField (SynField(_,_,id,_,_,_,_,_,_)) =
                     let lid = SynLongIdent.Create [id.Value.idText]
@@ -118,7 +114,7 @@ module internal Create =
 
                 arguments
 
-            SynExpr.Record(None, copyInfo, fieldUpdates, range0 )
+            SynExpr.Record(None, None, fieldUpdates, range0 )
 
         let returnTypeInfo =
             SynLongIdent.Create (recordId |> List.map (fun i -> i.idText))

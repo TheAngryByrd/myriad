@@ -34,6 +34,12 @@ let tests =
             Expect.equal z 1 "generated getters should be ok"
         }
 
+        test "Test1 map Test" {
+            let t = TestFields.Test1.create 1 "2" 3. (float32 4)
+            let mapped = TestFields.Test1.map (fun x -> x + 1) (fun s -> s + "!") (fun f -> f + 1.) (fun f -> f + float32 1) t
+            Expect.equal mapped { Test1.one = 2; two = "2!"; three = 4.; four = float32 5 } "map should transform all fields"
+        }
+
         testList "Lenses" [
             testList "Records" [
                 let t = TestFields.Test1.create 1 "2" 3. (float32 4)
