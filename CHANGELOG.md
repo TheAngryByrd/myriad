@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Expecto 10.2.1
     - Aether 8.3.1
     - McMaster.NETCore.Plugins 2.0.0
+- Removed `dotnet-mergenupkg` (broken in .NET 9 due to expired signature certificates)
+- `Myriad` and `Myriad.Sdk` are now published as separate NuGet packages; `Myriad.Sdk` declares `Myriad` as a transitive dependency so no manual tool installation is required
+- CI publish workflow now runs on `ubuntu-latest`
 ## [0.8.3]
 ## Fixed
 Nuget package now has correct link to changelog
