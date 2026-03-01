@@ -1,5 +1,7 @@
 module Tests
 
+open System
+open System.IO
 open Expecto
 open Example
 open Example.Lens
@@ -112,6 +114,76 @@ let literalBindingTests =
                 |> Option.defaultWith (fun () -> failwith "Generator.FieldsAttribute not found in test source")
             let constants = Ast.getAttributeConstantsWithBindings bindings attrib
             Expect.equal constants [] "should return empty list for unresolved ident"
+        }
+    ]
+
+let editorConfigTests =
+    testList "EditorConfig" [
+        test "readConfiguration returns FormatConfig.Default when no .editorconfig exists" {
+            // Use a path in a temp directory that has no .editorconfig
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_noconfig_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                let testFile = Path.Combine(tmpDir, "test.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.IndentSize Fantomas.Core.FormatConfig.Default.IndentSize "IndentSize should match default"
+                Expect.equal cfg.MaxLineLength Fantomas.Core.FormatConfig.Default.MaxLineLength "MaxLineLength should match default"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration applies indent_size from .editorconfig" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_indent_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nindent_size = 2\n")
+                let testFile = Path.Combine(tmpDir, "Output.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.IndentSize 2 "IndentSize should be 2 as per .editorconfig"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration applies max_line_length from .editorconfig" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_linelen_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nmax_line_length = 80\n")
+                let testFile = Path.Combine(tmpDir, "Output.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.MaxLineLength 80 "MaxLineLength should be 80 as per .editorconfig"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration applies fsharp-specific settings from .editorconfig" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_fsharp_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nfsharp_space_before_colon = true\n")
+                let testFile = Path.Combine(tmpDir, "Output.fs")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.isTrue cfg.SpaceBeforeColon "SpaceBeforeColon should be true as per .editorconfig"
+            finally
+                Directory.Delete(tmpDir, true)
+        }
+
+        test "readConfiguration respects .editorconfig glob patterns - only applies to .fs files" {
+            let tmpDir = Path.Combine(Path.GetTempPath(), $"myriad_ec_test_glob_{Guid.NewGuid()}")
+            Directory.CreateDirectory(tmpDir) |> ignore
+            try
+                // indent_size = 2 only applies to .fs files, not .fsi
+                File.WriteAllText(Path.Combine(tmpDir, ".editorconfig"), "[*.fs]\nindent_size = 2\n")
+                let testFile = Path.Combine(tmpDir, "Output.fsi")
+                File.WriteAllText(testFile, "")
+                let cfg = Myriad.Core.EditorConfig.readConfiguration testFile
+                Expect.equal cfg.IndentSize Fantomas.Core.FormatConfig.Default.IndentSize "IndentSize should be default for .fsi file"
+            finally
+                Directory.Delete(tmpDir, true)
         }
     ]
 
