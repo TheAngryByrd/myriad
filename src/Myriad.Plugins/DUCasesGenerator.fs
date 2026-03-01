@@ -177,10 +177,7 @@ module internal CreateDUModule =
             let info = SynComponentInfo.Create recordId
 
             let mdl = SynModuleDecl.CreateNestedModule(info,  declarations)
-            let dusNamespace =
-                config
-                |> Seq.tryPick (fun (n,v) -> if n = "namespace" then Some (v :?> string) else None  )
-                |> Option.defaultValue "UnknownNamespace"
+            let dusNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
             SynModuleOrNamespace.CreateNamespace(Ident.CreateLong dusNamespace, isRecursive = true, decls = [mdl])
         | _ -> failwithf "Not a record type"
 
