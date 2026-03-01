@@ -159,9 +159,7 @@ module internal CreateLenses =
                                              Some longIdent.AsString
             | expr-> failwithf $"Unsupported syntax of specifying the wrapper name for type %A{recordId}.\nExpr: %A{expr}"
 
-        let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-        let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-        let openParent = SynModuleDecl.CreateOpen openTarget
+        let openParent = SynModuleDecl.CreateOpen namespaceId
         let moduleInfo = SynComponentInfo.Create moduleIdent
 
         match synTypeDefnRepr with
@@ -190,34 +188,21 @@ type LensesGenerator() =
                 |> Async.RunSynchronously
                 |> Array.head
 
-            let namespaceAndRecords = Ast.extractRecords ast
-            let recordsModules =
-                namespaceAndRecords
-                |> List.collect (
-                    fun (ns, records) ->
-                    records
-                    |> List.choose (fun r ->
-                        let attr = Ast.getAttribute<Generator.LensesAttribute> r
-                        Option.map (fun a -> r, a) attr)
-                    |> List.map (fun (record, attrib) -> let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter record
-                                                         let recordsNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
-                                                         let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
-                                                         let synModule = CreateLenses.createLensModule ns record attrib usePipedSetter
-                                                         SynModuleOrNamespace.CreateNamespace(Ident.CreateLong recordsNamespace, isRecursive =true, decls = [synModule])))
+            let processTypeDefns extractFn =
+                extractFn ast
+                |> List.collect (fun (ns, typeDefns) ->
+                    typeDefns
+                    |> List.choose (fun t ->
+                        Ast.getAttribute<Generator.LensesAttribute> t
+                        |> Option.map (fun a -> t, a))
+                    |> List.map (fun (typeDefn, attrib) ->
+                        let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter typeDefn
+                        let lensNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+                        let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
+                        let synModule = CreateLenses.createLensModule ns typeDefn attrib usePipedSetter
+                        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong lensNamespace, isRecursive = true, decls = [synModule])))
 
-            let namespaceAndDUs = Ast.extractDU ast
-            let duModules =
-                namespaceAndDUs
-                |> List.collect (
-                    fun (ns, dus) ->
-                    dus
-                    |> List.choose (fun du ->
-                        let attr = Ast.getAttribute<Generator.LensesAttribute> du
-                        Option.map (fun a -> du, a) attr)
-                    |> List.map (fun (du, attrib) -> let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter du
-                                                     let dusNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
-                                                     let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
-                                                     let synModule = CreateLenses.createLensModule ns du attrib usePipedSetter
-                                                     SynModuleOrNamespace.CreateNamespace(Ident.CreateLong dusNamespace, isRecursive = true, decls = [synModule])))
+            let recordsModules = processTypeDefns Ast.extractRecords
+            let duModules = processTypeDefns Ast.extractDU
 
             Output.Ast [yield! recordsModules; yield! duModules]

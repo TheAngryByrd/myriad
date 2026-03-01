@@ -134,9 +134,7 @@ module internal Create =
         match synTypeDefnRepr with
         | SynTypeDefnRepr.Simple(SynTypeDefnSimpleRepr.Record(_accessibility, recordFields, _recordRange), _) ->
 
-            let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-            let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-            let openParent = SynModuleDecl.CreateOpen openTarget
+            let openParent = SynModuleDecl.CreateOpen namespaceId
 
             let fieldMaps = recordFields |> List.map (createFieldMap recordId)
 
