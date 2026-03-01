@@ -200,14 +200,8 @@ type LensesGenerator() =
                         let attr = Ast.getAttribute<Generator.LensesAttribute> r
                         Option.map (fun a -> r, a) attr)
                     |> List.map (fun (record, attrib) -> let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter record
-                                                         let recordsNamespace =
-                                                              config
-                                                              |> Seq.tryPick (fun (n, v) -> if n = "namespace" then Some (v :?> string) else None  )
-                                                              |> Option.defaultValue "UnknownNamespace"
-                                                         let usePipedSetter = 
-                                                             config
-                                                             |> Seq.tryPick (fun (n, v) -> if n = "pipedsetter" then Some (v :?> bool) else None  )
-                                                             |> Option.defaultValue false
+                                                         let recordsNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+                                                         let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
                                                          let synModule = CreateLenses.createLensModule ns record attrib usePipedSetter
                                                          SynModuleOrNamespace.CreateNamespace(Ident.CreateLong recordsNamespace, isRecursive =true, decls = [synModule])))
 
@@ -221,14 +215,8 @@ type LensesGenerator() =
                         let attr = Ast.getAttribute<Generator.LensesAttribute> du
                         Option.map (fun a -> du, a) attr)
                     |> List.map (fun (du, attrib) -> let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter du
-                                                     let dusNamespace =
-                                                         config
-                                                         |> Seq.tryPick (fun (n, v) -> if n = "namespace" then Some (v :?> string) else None  )
-                                                         |> Option.defaultValue "UnknownNamespace"
-                                                     let usePipedSetter = 
-                                                         config
-                                                         |> Seq.tryPick (fun (n, v) -> if n = "pipedsetter" then Some (v :?> bool) else None  )
-                                                         |> Option.defaultValue false
+                                                     let dusNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+                                                     let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
                                                      let synModule = CreateLenses.createLensModule ns du attrib usePipedSetter
                                                      SynModuleOrNamespace.CreateNamespace(Ident.CreateLong dusNamespace, isRecursive = true, decls = [synModule])))
 
