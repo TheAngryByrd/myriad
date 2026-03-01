@@ -111,9 +111,7 @@ module internal CreateDUModule =
         match synTypeDefnRepr with
         | SynTypeDefnRepr.Simple(SynTypeDefnSimpleRepr.Union(_accessibility, cases, _recordRange), _range) ->
 
-            let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-            let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-            let openParent = SynModuleDecl.CreateOpen openTarget
+            let openParent = SynModuleDecl.CreateOpen namespaceId
             let requiresQualifiedAccess =
                 Ast.hasAttribute<RequireQualifiedAccessAttribute> typeDefn
                 || config |> Seq.exists (fun (n, v) -> n = "alwaysFullyQualify" && v :?> bool = true)

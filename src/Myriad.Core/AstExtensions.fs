@@ -414,6 +414,8 @@ module AstExtensions =
             SynModuleDecl.Open(id, range0)
         static member CreateOpen (fullNamespaceOrModuleName: string) =
             SynModuleDecl.Open(SynOpenDeclTarget.ModuleOrNamespace(SynLongIdent.CreateString fullNamespaceOrModuleName, range0), range0)
+        static member CreateOpen (namespaceId: LongIdent) =
+            SynModuleDecl.Open(SynOpenDeclTarget.ModuleOrNamespace(SynLongIdent.CreateFromLongIdent namespaceId, range0), range0)
         static member CreateHashDirective (directive, values) =
             SynModuleDecl.HashDirective (ParsedHashDirective (directive, values, range0), range0)
 

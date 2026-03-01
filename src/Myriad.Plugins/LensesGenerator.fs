@@ -159,9 +159,7 @@ module internal CreateLenses =
                                              Some longIdent.AsString
             | expr-> failwithf $"Unsupported syntax of specifying the wrapper name for type %A{recordId}.\nExpr: %A{expr}"
 
-        let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-        let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-        let openParent = SynModuleDecl.CreateOpen openTarget
+        let openParent = SynModuleDecl.CreateOpen namespaceId
         let moduleInfo = SynComponentInfo.Create moduleIdent
 
         match synTypeDefnRepr with
