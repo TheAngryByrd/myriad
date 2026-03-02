@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `SynType.CreateFromLongIdent` helper in `Myriad.Core.AstExtensions`. Plugin authors can now convert a `LongIdent` to a `SynType` using this single convenience method instead of manually chaining `SynLongIdent.Create` and `SynType.CreateLongIdent`.
+- Generated code is now formatted using `.editorconfig` settings applicable to the output file. Myriad previously formatted all generated code with `FormatConfig.Default`, ignoring any Fantomas settings in `.editorconfig`. The new `Myriad.Core.EditorConfig.readConfiguration` function reads the `.editorconfig` file for the output path and maps `indent_size`, `max_line_length`, `end_of_line`, `insert_final_newline`, and all `fsharp_*` Fantomas properties to the corresponding `FormatConfig` values. If no `.editorconfig` is present, `FormatConfig.Default` is used as before.
+- `Ast.extractLiteralBindings` and `Ast.getAttributeConstantsWithBindings` helpers in `Myriad.Core`. Plugin authors can now resolve `[<Literal>]`-attributed identifier references in attribute arguments to their actual string values — for example when a type is annotated with `[<MyAttr(MyConst)>]` where `let [<Literal>] MyConst = "Hello"` is defined elsewhere in the same file.
 
 ### Fixed
 - Myriad now correctly processes input files that contain F# 8 dot-lambda (`_.property`) shorthand syntax. Previously, types using `_.` in `with member` bodies would cause a parse error:

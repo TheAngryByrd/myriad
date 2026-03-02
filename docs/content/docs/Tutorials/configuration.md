@@ -76,3 +76,18 @@ ValidInputExtensions is used so a plugin is tied to certain file types as input,
 While we are discussing the `IMyriadGenerator` interface lets discuss the `Generate` member:
 
 Generate takes a `GeneratorContext` which contains the `ConfigKey` as mentioned above, the `ConfigGetter` : `string -> (string * obj) seq` which is a mean to allow access to the `myriad.toml` file, you give the function the configuration ket you wish to receive and it returns the configuration.  Finally a `InputFilename` is also passed in so you can load or parse your input files ready to generate an AST.  If you look at the included plugins you can see the mechanism for extracting and building AST fragments for reference.  
+
+# Code Formatting and .editorconfig
+
+Myriad formats generated code using the [Fantomas](https://fsprojects.github.io/fantomas/) code formatter. By default it uses `FormatConfig.Default`, but if an `.editorconfig` file exists in or above the output file's directory, Myriad will automatically apply those settings.
+
+Any standard Fantomas `.editorconfig` properties are supported, for example:
+
+```ini
+[*.fs]
+indent_size = 2
+max_line_length = 100
+fsharp_space_before_colon = true
+```
+
+This means generated files will match your project's formatting conventions without requiring them to be listed in `.fantomasignore`. The `.editorconfig` lookup is scoped to the output file path, so different output files in different directories can use different formatting settings.

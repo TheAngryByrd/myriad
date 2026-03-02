@@ -74,3 +74,34 @@ Myriad supports loading plugins built against a **different target framework** t
 The plugin loader uses `PreferSharedTypes = true`, which means assemblies already loaded by the Myriad host — such as `FSharp.Core` and `Fantomas.FCS` — are shared with the plugin rather than loaded again from the plugin's output directory. This prevents `System.Reflection.ReflectionTypeLoadException` that would otherwise occur due to type identity mismatches across `AssemblyLoadContext` boundaries.
 
 > **Note:** While cross-framework plugin loading is supported, it is still recommended to target the same framework version as the Myriad tool for the most predictable behaviour.
+
+## Resolving Literal Constant References in Attribute Arguments
+
+When a type uses a `[<Literal>]`-attributed identifier as an attribute argument, the standard `Ast.getAttributeConstants` helper returns the identifier name rather than the constant value. For example:
+
+```fsharp
+module A =
+    let [<Literal>] MyConst = "Hello"
+
+    [<MyAttribute(MyConst)>]
+    type Thing = { Foo: string }
+```
+
+To resolve `MyConst` to `"Hello"` in your plugin, use the two-step API in `Myriad.Core.Ast`:
+
+1. **`Ast.extractLiteralBindings`** — scans the entire parsed AST and returns a `Map<string, SynConst>` of all `[<Literal>]` bindings.
+2. **`Ast.getAttributeConstantsWithBindings`** — works like `getAttributeConstants` but also looks up any identifier arguments in the bindings map.
+
+```fsharp
+open Myriad.Core
+
+// In your Generate implementation:
+let bindings = Ast.extractLiteralBindings ast  // ast : ParsedInput from GeneratorContext
+
+let constants =
+    someAttribute
+    |> Ast.getAttributeConstantsWithBindings bindings
+// constants : string list — identifier references are now resolved to their literal values
+```
+
+This avoids the need for type-checking (which would be significantly slower) and works entirely from the parsed AST available to every Myriad plugin.
