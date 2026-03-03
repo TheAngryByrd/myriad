@@ -27,6 +27,12 @@ module internal CreateDUModule =
         let ident = SynLongIdent.CreateString inputIdent
         SynExpr.CreateLongIdent(false, ident, None)
 
+    let createCaseMatchClause (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Ident) (hasFields: bool) (rhs: SynExpr) : SynMatchClause =
+        let indent = resolveCaseIdent requiresQualifiedAccess parent id
+        let args = if hasFields then [SynPat.CreateWild] else []
+        let p = SynPat.CreateLongIdent(indent, args)
+        SynMatchClause.Create(p, None, rhs)
+
     let createDuLetBinding (varName: string) (inputType: SynType) (returnType: SynType) (buildMatchClauses: unit -> SynMatchClause list) : SynModuleDecl =
         let varIdent = SynLongIdent.CreateString varName
         let inputIdent = "x"
@@ -41,11 +47,8 @@ module internal CreateDUModule =
         createDuLetBinding "toString" duType (SynType.String()) (fun () ->
             cases
             |> List.map (fun (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_) as unionCase) ->
-                let indent = resolveCaseIdent requiresQualifiedAccess parent id
-                let args = if unionCase.HasFields then [SynPat.CreateWild] else []
-                let p = SynPat.CreateLongIdent(indent, args)
                 let rhs = SynExpr.CreateConst(SynConst.CreateString id.idText)
-                SynMatchClause.Create(p, None, rhs)
+                createCaseMatchClause requiresQualifiedAccess parent id unionCase.HasFields rhs
             )
         )
 
@@ -79,11 +82,8 @@ module internal CreateDUModule =
             cases
             |> List.mapi (fun i case ->
                 let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
-                let indent = resolveCaseIdent requiresQualifiedAccess parent id
-                let args = if case.HasFields then [SynPat.CreateWild] else []
-                let p = SynPat.CreateLongIdent(indent, args)
                 let rhs = SynExpr.Const(SynConst.Int32 i, range0)
-                SynMatchClause.Create(p, None, rhs)
+                createCaseMatchClause requiresQualifiedAccess parent id case.HasFields rhs
             )
         )
 
@@ -93,11 +93,8 @@ module internal CreateDUModule =
             let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
             createDuLetBinding $"is%s{id.idText}" duType (SynType.Bool()) (fun () ->
                 let matchCase =
-                    let indent = resolveCaseIdent requiresQualifiedAccess parent id
-                    let args = if case.HasFields then [SynPat.CreateWild] else []
-                    let p = SynPat.CreateLongIdent(indent, args)
                     let rhs = SynExpr.CreateConst(SynConst.Bool true)
-                    SynMatchClause.Create(p, None, rhs)
+                    createCaseMatchClause requiresQualifiedAccess parent id case.HasFields rhs
                 let wildCase =
                     let rhs = SynExpr.CreateConst(SynConst.Bool false)
                     SynMatchClause.Create(SynPat.CreateWild, None, rhs)
