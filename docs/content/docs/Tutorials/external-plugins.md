@@ -67,6 +67,28 @@ In your testing `fsproj` you would add the following to allow the plugin to be u
 <Import Project="<Path to Generator plugin location>\build\Myriad.Plugins.InTest.props" />
 ```
 
+## AST Helper Utilities
+
+Myriad provides a number of convenience helpers in `Myriad.Core.AstExtensions` to simplify building F# AST nodes in plugins.
+
+### `SynType.CreateFromLongIdent`
+
+Converts a `LongIdent` directly to a `SynType`. This is equivalent to chaining `SynLongIdent.Create` and `SynType.CreateLongIdent`, but expressed as a single call:
+
+```fsharp
+open Myriad.Core
+
+// Instead of:
+let synType =
+    SynLongIdent.Create (ident |> List.map (fun i -> i.idText))
+    |> SynType.CreateLongIdent
+
+// You can now write:
+let synType = SynType.CreateFromLongIdent ident
+```
+
+This is useful when your plugin receives a `LongIdent` (e.g. from the namespace or type name in the parsed input) and needs to reference it as a type annotation in the generated AST.
+
 ## Framework Compatibility
 
 Myriad supports loading plugins built against a **different target framework** than the Myriad tool itself. For example, a plugin targeting `net8.0` can be loaded by the `net9.0` Myriad tool without errors.

@@ -51,11 +51,10 @@ module Test1 =
           four = four }
 
     let map (mapone : int -> int) (maptwo : string -> string) (mapthree : float -> float) (mapfour : float32 -> float32) (record': Test1) =
-      { record' with
-          one = mapone record'.one
-          two = maptwo record'.two
-          three = mapthree record'.three
-          four = mapfour record'.four }
+      { one = mapone record'.one
+        two = maptwo record'.two
+        three = mapthree record'.three
+        four = mapfour record'.four }
 ```
 
 The fields plugin generates a `map` for each field in the input record, a `create` function taking each field, and a `map` function that takes one function per field in the input record.
