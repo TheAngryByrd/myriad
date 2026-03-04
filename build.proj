@@ -20,9 +20,15 @@
   </Target>
 
   <Target Name="Pack" DependsOnTargets="Clean;Restore;Test">
-    <!-- pack sdk then whole sln -->
-    <Exec Command='dotnet pack src/Myriad.Sdk/Myriad.Sdk.proj -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
+    <!-- Create the output directory first so it exists as a local NuGet source -->
+    <MakeDir Directories="$(NupkgsDir)" />
+    <!-- Pack the main sln first so the Myriad tool nupkg is available locally -->
     <Exec Command='dotnet pack src/Myriad.sln -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
+    <!-- Restore Myriad.Sdk pointing at the local nupkg directory so the just-built
+         Myriad package is resolved without requiring it to be published on nuget.org -->
+    <Exec Command='dotnet restore src/Myriad.Sdk/Myriad.Sdk.proj /p:Version=$(Version) --source "$(NupkgsDir)" --source "https://api.nuget.org/v3/index.json"' />
+    <!-- Pack Myriad.Sdk using the restore done above (skip redundant restore) -->
+    <Exec Command='dotnet pack src/Myriad.Sdk/Myriad.Sdk.proj -c Release -o "$(NupkgsDir)" /p:Version=$(Version) --no-restore' />
   </Target>
 
 </Project>
