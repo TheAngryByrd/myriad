@@ -158,17 +158,11 @@ type FieldsGenerator() =
         member _.ValidInputExtensions = seq {".fs"}
         member _.Generate(context: GeneratorContext) =
             //_myriadConfigKey is not currently used but could be a failover config section to use when the attribute passes no config section, or used as a root config
-            let ast, _ =
-                Ast.fromFilename context.InputFilename
-                |> Async.RunSynchronously
-                |> Array.head
+            let ast, _ = GeneratorHelpers.parseInputAst context
 
             let namespaceAndrecords =
                 Ast.extractRecords ast
-                |> List.choose (fun (ns, types) ->
-                    match types |> List.filter Ast.hasAttribute<Generator.FieldsAttribute> with
-                    | [] -> None
-                    | types -> Some (ns, types))
+                |> GeneratorHelpers.filterByAttribute<Generator.FieldsAttribute>
 
             let modules =
                 namespaceAndrecords
