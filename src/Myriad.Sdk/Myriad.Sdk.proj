@@ -10,7 +10,7 @@
     <Description>MSBuild integration between Myriad and .NET Sdk projects</Description>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Myriad" Version="$(Version)" />
+    <PackageDownload Include="Myriad" Version="[$(Version)]" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="build\Myriad.Sdk.props">
