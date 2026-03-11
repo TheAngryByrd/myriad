@@ -20,3 +20,16 @@ module internal GeneratorHelpers =
             match types |> List.filter Ast.hasAttribute<'A> with
             | [] -> None
             | types -> Some (ns, types))
+
+    /// Runs the standard generator pipeline: parse input AST, extract types, filter by attribute,
+    /// and collect modules. Eliminates the boilerplate shared by DUCasesGenerator and FieldsGenerator.
+    let generateModules<'Attr> (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> (string * obj) seq -> SynModuleOrNamespace) : Output =
+        let ast, _ = parseInputAst context
+        let namespacedTypes = extract ast |> filterByAttribute<'Attr>
+        let modules =
+            namespacedTypes
+            |> List.collect (fun (ns, types) ->
+                types |> List.map (fun t ->
+                    let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
+                    create ns t config))
+        Output.Ast modules
