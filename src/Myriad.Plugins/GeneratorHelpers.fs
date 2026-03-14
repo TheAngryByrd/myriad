@@ -32,6 +32,13 @@ module internal GeneratorHelpers =
             | [] -> None
             | types -> Some (ns, types))
 
+    /// Creates `(name: typ)` — a parenthesised, typed, named pattern.
+    /// Eliminates the repeated `SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed …, …))` idiom.
+    let createTypedNamedParen (name: Ident) (typ: SynType) : SynPat =
+        SynPat.CreateNamed name
+        |> fun p -> SynPat.CreateTyped(p, typ)
+        |> SynPat.CreateParen
+
     /// Runs the standard generator pipeline: parse input AST, extract types, filter by attribute,
     /// and collect modules. Eliminates the boilerplate shared by DUCasesGenerator and FieldsGenerator.
     let generateModules<'Attr> (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> (string * obj) seq -> SynModuleOrNamespace) : Output =
