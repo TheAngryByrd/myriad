@@ -24,16 +24,16 @@ module internal CreateLenses =
                     
         let letPat = SynPat.CreateNamed fieldName
         let lambdaGetBody = SynExpr.CreateLongIdent(SynLongIdent.Create ["x"; fieldName.idText])
-        let lambdaGetPats = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x"), recordType))]
+        let lambdaGetPats = [GeneratorHelpers.createTypedNamedParen (Ident.Create "x") recordType]
         
         let lambdaSetBody =
             let innerPats =
                 if aetherStyle then
-                    [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "value"), fieldType))
-                     SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x"), recordType))]
+                    [GeneratorHelpers.createTypedNamedParen (Ident.Create "value") fieldType
+                     GeneratorHelpers.createTypedNamedParen (Ident.Create "x") recordType]
                 else
-                    [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x"), recordType))
-                     SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "value"), fieldType)) ]
+                    [GeneratorHelpers.createTypedNamedParen (Ident.Create "x") recordType
+                     GeneratorHelpers.createTypedNamedParen (Ident.Create "value") fieldType]
                     
             let innerBody =
                 let copySrc = SynExpr.CreateLongIdent(false, SynLongIdent.Create ["x"], None)
@@ -87,7 +87,7 @@ module internal CreateLenses =
             let setter =
                 let valueIdent = Ident.Create "value"
 
-                let valueArgPatterns = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed valueIdent, fieldType))]
+                let valueArgPatterns = [GeneratorHelpers.createTypedNamedParen valueIdent fieldType]
 
                 let duType = SynType.CreateFromLongIdent parent
 
@@ -95,8 +95,8 @@ module internal CreateLenses =
                 
                 let innerLambdaWithValue = SynExpr.CreateLambda([], createCase) //inner does not have pats as they are pushed in via the outer lambda
 
-                let getArgs = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed (Ident.Create "_"), duType))
-                               SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed valueIdent, fieldType))] //inner lambdas pat ∆
+                let getArgs = [GeneratorHelpers.createTypedNamedParen (Ident.Create "_") duType
+                               GeneratorHelpers.createTypedNamedParen valueIdent fieldType] //inner lambdas pat ∆
 
                 SynExpr.CreateLambda(pats = getArgs, body = innerLambdaWithValue)
 
@@ -104,7 +104,7 @@ module internal CreateLenses =
 
             let getterLet =
                 let valData = SynValData.SynValData(None, SynValInfo.Empty, None)
-                let synPat = SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x", false), duType))
+                let synPat = GeneratorHelpers.createTypedNamedParen (Ident.Create "x") duType
 
                 let synPat = SynPat.LongIdent (SynLongIdent.CreateString "getter", None, None, SynArgPats.Pats [synPat], None, range0)
 
