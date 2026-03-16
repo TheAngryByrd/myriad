@@ -51,3 +51,16 @@ module internal GeneratorHelpers =
                     let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
                     create ns t config))
         Output.Ast modules
+
+    /// Variant of generateModules that passes the resolved SynAttribute to the create function.
+    /// Takes a pre-parsed ast so the caller can invoke it multiple times without re-parsing.
+    /// Returns a raw SynModuleOrNamespace list so results from multiple calls can be combined
+    /// before wrapping in Output.Ast.
+    let collectModulesWithAttr<'Attr> (ast: ParsedInput) (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> SynAttribute -> (string * obj) seq -> SynModuleOrNamespace) : SynModuleOrNamespace list =
+        extract ast
+        |> List.collect (fun (ns, types) ->
+            types
+            |> List.choose (fun t -> Ast.getAttribute<'Attr> t |> Option.map (fun a -> t, a))
+            |> List.map (fun (t, attr) ->
+                let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
+                create ns t attr config))

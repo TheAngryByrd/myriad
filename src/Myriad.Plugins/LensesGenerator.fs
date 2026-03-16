@@ -179,22 +179,13 @@ type LensesGenerator() =
             //context.ConfigKey is not currently used but could be a failover config section to use when the attribute passes no config section, or used as a root config
             let ast, _ = GeneratorHelpers.parseInputAst context
 
-            let processTypeList namespaceAndTypes =
-                namespaceAndTypes
-                |> List.collect (
-                    fun (ns, types) ->
-                    types
-                    |> List.choose (fun t ->
-                        let attr = Ast.getAttribute<Generator.LensesAttribute> t
-                        Option.map (fun a -> t, a) attr)
-                    |> List.map (fun (typeDefn, attrib) ->
-                        let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter typeDefn
-                        let typeNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
-                        let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
-                        let synModule = CreateLenses.createLensModule ns typeDefn attrib usePipedSetter
-                        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong typeNamespace, isRecursive = true, decls = [synModule])))
+            let create ns typeDefn (attr: SynAttribute) config =
+                let typeNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+                let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
+                let synModule = CreateLenses.createLensModule ns typeDefn attr usePipedSetter
+                SynModuleOrNamespace.CreateNamespace(Ident.CreateLong typeNamespace, isRecursive = true, decls = [synModule])
 
-            let recordsModules = processTypeList (Ast.extractRecords ast)
-            let duModules = processTypeList (Ast.extractDU ast)
+            let recordsModules = GeneratorHelpers.collectModulesWithAttr<Generator.LensesAttribute> ast context Ast.extractRecords create
+            let duModules = GeneratorHelpers.collectModulesWithAttr<Generator.LensesAttribute> ast context Ast.extractDU create
 
             Output.Ast [yield! recordsModules; yield! duModules]
