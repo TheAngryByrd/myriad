@@ -189,10 +189,9 @@ type LensesGenerator() =
                         Option.map (fun a -> t, a) attr)
                     |> List.map (fun (typeDefn, attrib) ->
                         let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter typeDefn
-                        let typeNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
                         let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
                         let synModule = CreateLenses.createLensModule ns typeDefn attrib usePipedSetter
-                        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong typeNamespace, isRecursive = true, decls = [synModule])))
+                        GeneratorHelpers.createNamespacedModule config synModule))
 
             let recordsModules = processTypeList (Ast.extractRecords ast)
             let duModules = processTypeList (Ast.extractDU ast)
