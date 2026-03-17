@@ -137,9 +137,7 @@ module internal Create =
 
             let info = SynComponentInfo.Create recordId
             let mdl = SynModuleDecl.CreateNestedModule(info,  decls)
-            let fieldsNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
-
-            SynModuleOrNamespace.CreateNamespace(Ident.CreateLong fieldsNamespace, isRecursive = true, decls = [mdl])
+            GeneratorHelpers.createNamespacedModule config mdl
         | _ -> failwithf "Not a record type"
 
 [<MyriadGenerator("fields")>]
