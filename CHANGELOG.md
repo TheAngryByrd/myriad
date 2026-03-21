@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.6] - 2026-03-13
+## [0.8.6] - 2026-03-21
 
 ### Fixed
 - Publish workflow now supports manual dispatch via `workflow_dispatch` input, uses `$GITHUB_OUTPUT` instead of deprecated `::set-output`, and replaces archived GitHub Actions with `softprops/action-gh-release@v2`. A missing `dotnet paket restore` step was also added before build and test steps. (#234)
@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `Ast.extractTypeDefn` and `Ast.ModuleOrNamespace.getTypeDefns` now share a single private `extractTypesFromDecls` helper, eliminating an identical nested `extractTypes` definition that was duplicated in both functions. (#262)
 - `resolveCaseIdent` helper extracted from `DUCasesGenerator` into `GeneratorHelpers`, eliminating duplication with `LensesGenerator`. (#253)
-- `generateModules` helper extracted into `GeneratorHelpers`, eliminating the duplicate `Generate` pipeline boilerplate in `DUCasesGenerator` and `FieldsGenerator`. (#241, #255)
+- `generateModules` and `filterByAttribute` helpers extracted into `GeneratorHelpers`, eliminating the duplicate `Generate` pipeline boilerplate in `DUCasesGenerator` and `FieldsGenerator`. (#241, #255, #257, #258)
+- `createTypedNamedParen` helper extracted into `GeneratorHelpers`, eliminating thirteen identical `SynPat.CreateNamed |> SynPat.CreateTyped |> SynPat.CreateParen` expressions. (#265)
 - `filterTypes` helper extracted into `Ast`, eliminating five identical inline filter expressions. (#250)
 - Expecto test framework updated from 10.2.1 to 10.2.3 (patch). (#243)
 
