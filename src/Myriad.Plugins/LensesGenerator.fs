@@ -18,7 +18,7 @@ module internal CreateLenses =
 
     let private createLensForRecordField (parent: LongIdent) (wrapperName : Option<string>) (aetherStyle: bool) (field: SynField) =
         let (SynField.SynField(_,_,id,fieldType,_,_,_,_,_)) = field
-        let fieldName = match id with None -> failwith "no field name" | Some f -> f
+        let fieldName = GeneratorHelpers.getFieldName id
 
         let recordType = SynType.CreateFromLongIdent parent
                     
