@@ -8,80 +8,56 @@ open Myriad.Core.Ast
 module internal CreateDUModule =
     open Fantomas.FCS.Text.Range
 
-    let createToString (requiresQualifiedAccess: bool) (parent: LongIdent) (cases: SynUnionCase list) =
-        let varIdent = SynLongIdent.CreateString "toString"
+    let createDuInputPattern (varIdent: SynLongIdent) (duType: SynType) : SynPat =
         let inputIdent = "x"
+        let ident = Ident(inputIdent, range0)
+        let name = SynPat.CreateNamed(ident)
+        let args = SynPat.CreateTyped(name, duType) |> SynPat.CreateParen
+        SynPat.CreateLongIdent(varIdent, [args])
 
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+    let createMatchOnIdent (inputIdent: string) : SynExpr =
+        let ident = SynLongIdent.CreateString inputIdent
+        SynExpr.CreateLongIdent(false, ident, None)
 
-        let pattern =
-            let ident = Ident(inputIdent, range0)
-            let name = SynPat.CreateNamed(ident)
-            let args = SynPat.CreateTyped(name, duType) |> SynPat.CreateParen
-            SynPat.CreateLongIdent(varIdent, [args])
+    let createCaseMatchClause (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Ident) (hasFields: bool) (rhs: SynExpr) : SynMatchClause =
+        let indent = GeneratorHelpers.resolveCaseIdent requiresQualifiedAccess parent id
+        let args = if hasFields then [SynPat.CreateWild] else []
+        let p = SynPat.CreateLongIdent(indent, args)
+        SynMatchClause.Create(p, None, rhs)
 
-        let expr =
-            let matches =
-                cases
-                |> List.map (fun (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_) as unionCase) ->
-                    let matchCaseIdentParts =
-                        if requiresQualifiedAccess then
-                            (parent |> List.map (fun i -> i.idText)) @ [id.idText]
-                        else
-                            [id.idText]
-                    let indent = SynLongIdent.Create matchCaseIdentParts
-                    let args = if unionCase.HasFields then [SynPat.CreateWild] else []                       
-                        
-                    let p = SynPat.CreateLongIdent(indent, args)
-                    let rhs =
-                       SynExpr.CreateConst(SynConst.CreateString id.idText)
-                    SynMatchClause.Create(p, None, rhs)
-                )
-            let matchOn =
-                let ident = SynLongIdent.CreateString inputIdent
-                SynExpr.CreateLongIdent(false, ident, None)
-
-            SynExpr.CreateMatch(matchOn, matches)
-
-        let returnTypeInfo = SynBindingReturnInfo.Create (SynType.String())
+    let createDuLetBinding (varName: string) (inputType: SynType) (returnType: SynType) (buildMatchClauses: unit -> SynMatchClause list) : SynModuleDecl =
+        let varIdent = SynLongIdent.CreateString varName
+        let inputIdent = "x"
+        let pattern = createDuInputPattern varIdent inputType
+        let matchOn = createMatchOnIdent inputIdent
+        let expr = SynExpr.Match(DebugPointAtBinding.NoneAtLet, matchOn, buildMatchClauses(), range0, SynExprMatchTrivia.Zero)
+        let returnTypeInfo = SynBindingReturnInfo.Create returnType
         SynModuleDecl.CreateLet [SynBinding.Let(pattern = pattern, expr = expr, returnInfo = returnTypeInfo)]
 
+    let createToString (requiresQualifiedAccess: bool) (parent: LongIdent) (cases: SynUnionCase list) =
+        let duType = SynType.CreateFromLongIdent parent
+        createDuLetBinding "toString" duType (SynType.String()) (fun () ->
+            cases
+            |> List.map (fun (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_) as unionCase) ->
+                let rhs = SynExpr.CreateConst(SynConst.CreateString id.idText)
+                createCaseMatchClause requiresQualifiedAccess parent id unionCase.HasFields rhs
+            )
+        )
+
     let createFromString (requiresQualifiedAccess: bool) (parent: LongIdent) (cases: SynUnionCase list) =
-        let varIdent = SynLongIdent.CreateString "fromString"
-        let inputIdent = "x"
-
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
-
-        let inputType =
-            SynLongIdent.CreateString "string"
-            |> SynType.CreateLongIdent
-
-        let pattern =
-            let ident = Ident(inputIdent, range0)
-            let name = SynPat.CreateNamed(ident)
-            let args = SynPat.CreateTyped(name, inputType) |> SynPat.CreateParen
-            SynPat.CreateLongIdent(varIdent, [args])
-
-        let expr =
+        let duType = SynType.CreateFromLongIdent parent
+        let inputType = SynLongIdent.CreateString "string" |> SynType.CreateLongIdent
+        createDuLetBinding "fromString" inputType (SynType.Option duType) (fun () ->
             let matches =
                 cases
                 //Only provide `fromString` for cases with no fields
                 |> List.filter (fun c -> not c.HasFields)
                 |> List.map (fun (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) ->
-                    let con =  SynConst.CreateString id.idText
+                    let con = SynConst.CreateString id.idText
                     let pat = SynPat.CreateConst(con)
                     let rhs =
                         let f = SynExpr.Ident (Ident("Some", range0))
-                        let matchCaseIdentParts =
-                            if requiresQualifiedAccess then
-                                (parent |> List.map (fun i -> i.idText)) @ [id.idText]
-                            else
-                                [id.idText]
-                        let fullCaseName = SynLongIdent.Create matchCaseIdentParts
+                        let fullCaseName = GeneratorHelpers.resolveCaseIdent requiresQualifiedAccess parent id
                         let x = SynExpr.CreateLongIdent fullCaseName
                         SynExpr.App(ExprAtomicFlag.NonAtomic, false, f, x, range0)
                     SynMatchClause.Create(pat, None, rhs)
@@ -89,97 +65,33 @@ module internal CreateDUModule =
             let wildCase =
                 let rhs = SynExpr.Ident (Ident("None", range0))
                 SynMatchClause.Create(SynPat.CreateWild, None, rhs)
-
-            let matchOn =
-                let ident = SynLongIdent.CreateString inputIdent
-                SynExpr.CreateLongIdent(false, ident, None)
-
-            SynExpr.Match(DebugPointAtBinding.NoneAtLet, matchOn, [yield! matches; wildCase], range0, SynExprMatchTrivia.Zero)
-
-        let returnTypeInfo = SynBindingReturnInfo.Create (SynType.Option duType)
-        SynModuleDecl.CreateLet [SynBinding.Let(pattern = pattern, expr = expr, returnInfo = returnTypeInfo)]
+            [yield! matches; wildCase]
+        )
 
     let createToTag (requiresQualifiedAccess: bool) (parent: LongIdent) (cases: SynUnionCase list) =
-        let varIdent = SynLongIdent.CreateString "toTag"
-        let inputIdent = "x"
-
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
-
-        let pattern =
-            let ident = Ident(inputIdent, range0)
-            let name = SynPat.CreateNamed(ident)
-            let args = SynPat.CreateTyped(name, duType) |> SynPat.CreateParen
-            SynPat.CreateLongIdent(varIdent, [args])
-
-        let expr =
-            let matches =
-                cases
-                |> List.mapi (fun i case ->
-                    let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
-                    let matchCaseIdentParts =
-                        if requiresQualifiedAccess then
-                            (parent |> List.map (fun i -> i.idText)) @ [id.idText]
-                        else
-                            [id.idText]
-                    let indent = SynLongIdent.Create matchCaseIdentParts
-                    let args = if case.HasFields then [SynPat.CreateWild] else []
-                    let p = SynPat.CreateLongIdent(indent, args)
-                    let rhs = SynExpr.Const(SynConst.Int32 i, range0)
-                    SynMatchClause.Create(p, None, rhs)
-                )
-            let matchOn =
-                let ident = SynLongIdent.CreateString inputIdent
-                SynExpr.CreateLongIdent(false, ident, None)
-
-            SynExpr.Match(DebugPointAtBinding.NoneAtLet , matchOn, matches, range0, SynExprMatchTrivia.Zero)
-
-        let returnTypeInfo = SynBindingReturnInfo.Create (SynType.Int())
-        SynModuleDecl.CreateLet [SynBinding.Let(pattern = pattern, expr = expr, returnInfo = returnTypeInfo)]
+        let duType = SynType.CreateFromLongIdent parent
+        createDuLetBinding "toTag" duType (SynType.Int()) (fun () ->
+            cases
+            |> List.mapi (fun i case ->
+                let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
+                let rhs = SynExpr.Const(SynConst.Int32 i, range0)
+                createCaseMatchClause requiresQualifiedAccess parent id case.HasFields rhs
+            )
+        )
 
     let createIsCase (requiresQualifiedAccess: bool) (parent: LongIdent) (cases: SynUnionCase list) =
+        let duType = SynType.CreateFromLongIdent parent
         [ for case in cases do
             let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
-            let varIdent = SynLongIdent.CreateString $"is%s{id.idText}"
-            let inputIdent = "x"
-
-            let duType =
-                SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-                |> SynType.CreateLongIdent
-
-            let pattern =
-                let ident = Ident(inputIdent, range0)
-                let name = SynPat.CreateNamed(ident)
-                let args = SynPat.CreateTyped(name, duType) |> SynPat.CreateParen
-                SynPat.CreateLongIdent(varIdent, [args])
-
-            let expr =
+            createDuLetBinding $"is%s{id.idText}" duType (SynType.Bool()) (fun () ->
                 let matchCase =
-                    let matchCaseIdentParts =
-                        if requiresQualifiedAccess then
-                            (parent |> List.map (fun i -> i.idText)) @ [id.idText]
-                        else
-                            [id.idText]
-                    let indent = SynLongIdent.Create matchCaseIdentParts
-                    let args = if case.HasFields then [SynPat.CreateWild] else []
-                    let p = SynPat.CreateLongIdent(indent, args)
-
-                    let rhs = SynExpr.Const (SynConst.Bool true, range0)
-                    SynMatchClause.Create(p, None, rhs)
-
+                    let rhs = SynExpr.CreateConst(SynConst.Bool true)
+                    createCaseMatchClause requiresQualifiedAccess parent id case.HasFields rhs
                 let wildCase =
-                    let rhs = SynExpr.CreateConst (SynConst.Bool false)
+                    let rhs = SynExpr.CreateConst(SynConst.Bool false)
                     SynMatchClause.Create(SynPat.CreateWild, None, rhs)
-
-                let matchOn =
-                    let ident = SynLongIdent.CreateString inputIdent
-                    SynExpr.CreateLongIdent(false, ident, None)
-
-                SynExpr.Match(DebugPointAtBinding.NoneAtLet, matchOn, [matchCase; wildCase], range0, SynExprMatchTrivia.Zero)
-
-            let returnTypeInfo = SynBindingReturnInfo.Create (SynType.Bool())
-            SynModuleDecl.CreateLet [SynBinding.Let(pattern = pattern, expr = expr, returnInfo = returnTypeInfo)]
+                [matchCase; wildCase]
+            )
         ]
 
     let createDuModule (namespaceId: LongIdent) (typeDefn: SynTypeDefn) (config: (string * obj) seq) =
@@ -188,9 +100,7 @@ module internal CreateDUModule =
         match synTypeDefnRepr with
         | SynTypeDefnRepr.Simple(SynTypeDefnSimpleRepr.Union(_accessibility, cases, _recordRange), _range) ->
 
-            let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-            let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-            let openParent = SynModuleDecl.CreateOpen openTarget
+            let openParent = SynModuleDecl.CreateOpen namespaceId
             let requiresQualifiedAccess =
                 Ast.hasAttribute<RequireQualifiedAccessAttribute> typeDefn
                 || config |> Seq.exists (fun (n, v) -> n = "alwaysFullyQualify" && v :?> bool = true)
@@ -210,10 +120,7 @@ module internal CreateDUModule =
             let info = SynComponentInfo.Create recordId
 
             let mdl = SynModuleDecl.CreateNestedModule(info,  declarations)
-            let dusNamespace =
-                config
-                |> Seq.tryPick (fun (n,v) -> if n = "namespace" then Some (v :?> string) else None  )
-                |> Option.defaultValue "UnknownNamespace"
+            let dusNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
             SynModuleOrNamespace.CreateNamespace(Ident.CreateLong dusNamespace, isRecursive = true, decls = [mdl])
         | _ -> failwithf "Not a record type"
 
@@ -224,23 +131,4 @@ type DUCasesGenerator() =
         member _.ValidInputExtensions = seq {".fs"}
         member _.Generate(context: GeneratorContext) =
             //context.ConfigKey is not currently used but could be a failover config section to use when the attribute passes no config section, or used as a root config
-            let ast, _ =
-                Ast.fromFilename context.InputFilename
-                |> Async.RunSynchronously
-                |> Array.head
-
-            let namespaceAndrecords =
-                Ast.extractDU ast
-                |> List.choose (fun (ns, types) ->
-                    match types |> List.filter Ast.hasAttribute<Generator.DuCasesAttribute> with
-                    | [] -> None
-                    | types -> Some (ns, types))
-
-            let modules =
-                namespaceAndrecords
-                |> List.collect (fun (ns, dus) ->
-                                    dus
-                                    |> List.map (fun du -> let config = Generator.getConfigFromAttribute<Generator.DuCasesAttribute> context.ConfigGetter du
-                                                           CreateDUModule.createDuModule ns du config))
-
-            Output.Ast modules
+            GeneratorHelpers.generateModules<Generator.DuCasesAttribute> context Ast.extractDU CreateDUModule.createDuModule

@@ -20,22 +20,20 @@ module internal CreateLenses =
         let (SynField.SynField(_,_,id,fieldType,_,_,_,_,_)) = field
         let fieldName = match id with None -> failwith "no field name" | Some f -> f
 
-        let recordType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let recordType = SynType.CreateFromLongIdent parent
                     
         let letPat = SynPat.CreateNamed fieldName
         let lambdaGetBody = SynExpr.CreateLongIdent(SynLongIdent.Create ["x"; fieldName.idText])
-        let lambdaGetPats = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x"), recordType))]
+        let lambdaGetPats = [GeneratorHelpers.createTypedNamedParen (Ident.Create "x") recordType]
         
         let lambdaSetBody =
             let innerPats =
                 if aetherStyle then
-                    [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "value"), fieldType))
-                     SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x"), recordType))]
+                    [GeneratorHelpers.createTypedNamedParen (Ident.Create "value") fieldType
+                     GeneratorHelpers.createTypedNamedParen (Ident.Create "x") recordType]
                 else
-                    [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x"), recordType))
-                     SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "value"), fieldType)) ]
+                    [GeneratorHelpers.createTypedNamedParen (Ident.Create "x") recordType
+                     GeneratorHelpers.createTypedNamedParen (Ident.Create "value") fieldType]
                     
             let innerBody =
                 let copySrc = SynExpr.CreateLongIdent(false, SynLongIdent.Create ["x"], None)
@@ -61,22 +59,14 @@ module internal CreateLenses =
             | SynUnionCaseKind.Fields (_ :: _) -> failwith "It is not possible to create a lens for a DU with several cases"
             | _ -> failwithf "Unsupported type"
 
-        let duType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let duType = SynType.CreateFromLongIdent parent
 
         let getterName = Ident("getter", range0)
         let pattern =
             SynPat.CreateLongIdent(SynLongIdent.CreateString "Lens'", [])
 
-        let matchCaseIdentParts =
-            if requiresQualifiedAccess then
-                (parent |> List.map (fun i -> i.idText)) @ [id.idText]
-            else
-                [id.idText]
-
         // The name of the DU case, optionally preceded by the name of the DU itself, if fully qualified access is required
-        let fullCaseName = SynLongIdent.Create matchCaseIdentParts
+        let fullCaseName = GeneratorHelpers.resolveCaseIdent requiresQualifiedAccess parent id
 
         let lensExpression =
             let matchCase =
@@ -97,18 +87,16 @@ module internal CreateLenses =
             let setter =
                 let valueIdent = Ident.Create "value"
 
-                let valueArgPatterns = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed valueIdent, fieldType))]
+                let valueArgPatterns = [GeneratorHelpers.createTypedNamedParen valueIdent fieldType]
 
-                let duType =
-                    SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-                    |> SynType.CreateLongIdent
+                let duType = SynType.CreateFromLongIdent parent
 
                 let createCase = SynExpr.App (ExprAtomicFlag.NonAtomic, false, SynExpr.LongIdent (false, fullCaseName, None, range0), SynExpr.Ident valueIdent, range0)
                 
                 let innerLambdaWithValue = SynExpr.CreateLambda([], createCase) //inner does not have pats as they are pushed in via the outer lambda
 
-                let getArgs = [SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed (Ident.Create "_"), duType))
-                               SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed valueIdent, fieldType))] //inner lambdas pat ∆
+                let getArgs = [GeneratorHelpers.createTypedNamedParen (Ident.Create "_") duType
+                               GeneratorHelpers.createTypedNamedParen valueIdent fieldType] //inner lambdas pat ∆
 
                 SynExpr.CreateLambda(pats = getArgs, body = innerLambdaWithValue)
 
@@ -116,7 +104,7 @@ module internal CreateLenses =
 
             let getterLet =
                 let valData = SynValData.SynValData(None, SynValInfo.Empty, None)
-                let synPat = SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed(Ident.Create "x", false), duType))
+                let synPat = GeneratorHelpers.createTypedNamedParen (Ident.Create "x") duType
 
                 let synPat = SynPat.LongIdent (SynLongIdent.CreateString "getter", None, None, SynArgPats.Pats [synPat], None, range0)
 
@@ -165,9 +153,7 @@ module internal CreateLenses =
                                              Some longIdent.AsString
             | expr-> failwithf $"Unsupported syntax of specifying the wrapper name for type %A{recordId}.\nExpr: %A{expr}"
 
-        let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-        let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-        let openParent = SynModuleDecl.CreateOpen openTarget
+        let openParent = SynModuleDecl.CreateOpen namespaceId
         let moduleInfo = SynComponentInfo.Create moduleIdent
 
         match synTypeDefnRepr with
@@ -191,51 +177,24 @@ type LensesGenerator() =
         member _.ValidInputExtensions = seq {".fs"}
         member _.Generate(context: GeneratorContext) =
             //context.ConfigKey is not currently used but could be a failover config section to use when the attribute passes no config section, or used as a root config
-            let ast, _ =
-                Ast.fromFilename context.InputFilename
-                |> Async.RunSynchronously
-                |> Array.head
+            let ast, _ = GeneratorHelpers.parseInputAst context
 
-            let namespaceAndRecords = Ast.extractRecords ast
-            let recordsModules =
-                namespaceAndRecords
+            let processTypeList namespaceAndTypes =
+                namespaceAndTypes
                 |> List.collect (
-                    fun (ns, records) ->
-                    records
-                    |> List.choose (fun r ->
-                        let attr = Ast.getAttribute<Generator.LensesAttribute> r
-                        Option.map (fun a -> r, a) attr)
-                    |> List.map (fun (record, attrib) -> let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter record
-                                                         let recordsNamespace =
-                                                              config
-                                                              |> Seq.tryPick (fun (n, v) -> if n = "namespace" then Some (v :?> string) else None  )
-                                                              |> Option.defaultValue "UnknownNamespace"
-                                                         let usePipedSetter = 
-                                                             config
-                                                             |> Seq.tryPick (fun (n, v) -> if n = "pipedsetter" then Some (v :?> bool) else None  )
-                                                             |> Option.defaultValue false
-                                                         let synModule = CreateLenses.createLensModule ns record attrib usePipedSetter
-                                                         SynModuleOrNamespace.CreateNamespace(Ident.CreateLong recordsNamespace, isRecursive =true, decls = [synModule])))
+                    fun (ns, types) ->
+                    types
+                    |> List.choose (fun t ->
+                        let attr = Ast.getAttribute<Generator.LensesAttribute> t
+                        Option.map (fun a -> t, a) attr)
+                    |> List.map (fun (typeDefn, attrib) ->
+                        let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter typeDefn
+                        let typeNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+                        let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
+                        let synModule = CreateLenses.createLensModule ns typeDefn attrib usePipedSetter
+                        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong typeNamespace, isRecursive = true, decls = [synModule])))
 
-            let namespaceAndDUs = Ast.extractDU ast
-            let duModules =
-                namespaceAndDUs
-                |> List.collect (
-                    fun (ns, dus) ->
-                    dus
-                    |> List.choose (fun du ->
-                        let attr = Ast.getAttribute<Generator.LensesAttribute> du
-                        Option.map (fun a -> du, a) attr)
-                    |> List.map (fun (du, attrib) -> let config = Generator.getConfigFromAttribute<Generator.LensesAttribute> context.ConfigGetter du
-                                                     let dusNamespace =
-                                                         config
-                                                         |> Seq.tryPick (fun (n, v) -> if n = "namespace" then Some (v :?> string) else None  )
-                                                         |> Option.defaultValue "UnknownNamespace"
-                                                     let usePipedSetter = 
-                                                         config
-                                                         |> Seq.tryPick (fun (n, v) -> if n = "pipedsetter" then Some (v :?> bool) else None  )
-                                                         |> Option.defaultValue false
-                                                     let synModule = CreateLenses.createLensModule ns du attrib usePipedSetter
-                                                     SynModuleOrNamespace.CreateNamespace(Ident.CreateLong dusNamespace, isRecursive = true, decls = [synModule])))
+            let recordsModules = processTypeList (Ast.extractRecords ast)
+            let duModules = processTypeList (Ast.extractDU ast)
 
             Output.Ast [yield! recordsModules; yield! duModules]

@@ -1,4 +1,4 @@
-baseURL = "https://moiraesoftware.github.io/myriad/"
+baseURL = "https://moiraesoftware.github.io/Myriad/"
 languageCode = "en-us"
 title = "Myriad"
 theme = "hugo-theme-relearn"

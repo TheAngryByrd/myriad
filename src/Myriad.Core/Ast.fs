@@ -124,6 +124,61 @@ module Ast =
         | StringConst text -> [text]
         | _ -> []
 
+    /// Extracts all [&lt;Literal&gt;] bindings from the parsed AST into a map from identifier name to constant value.
+    /// This can be used with getAttributeConstantsWithBindings to resolve identifier references in attribute arguments.
+    let extractLiteralBindings (ast: ParsedInput) : Map<string, SynConst> =
+        let isLiteralAttribute (attrib: SynAttribute) =
+            match attrib.TypeName with
+            | SynLongIdent([id], _, _) ->
+                let name = id.idText
+                name = "Literal" || name = "LiteralAttribute"
+            | _ -> false
+
+        let rec extractFromDecls (decls: SynModuleDecl list) =
+            [ for decl in decls do
+                match decl with
+                | SynModuleDecl.Let(_, bindings, _) ->
+                    for SynBinding.SynBinding(_, _, _, _, attributes, _, _, headPat, _, expr, _, _, _) in bindings do
+                        let hasLiteralAttr =
+                            attributes
+                            |> List.collect (fun al -> al.Attributes)
+                            |> List.exists isLiteralAttribute
+                        if hasLiteralAttr then
+                            // Match simple identifier bindings (e.g. `let [<Literal>] Name = value`)
+                            // In the parsed AST these use SynPat.LongIdent with a single identifier and no arguments
+                            match headPat, expr with
+                            | SynPat.LongIdent(SynLongIdent([id], _, _), None, None, SynArgPats.Pats [], None, _), SynExpr.Const(c, _) ->
+                                yield id.idText, c
+                            | _ -> ()
+                | SynModuleDecl.NestedModule(_, _, decls, _, _, _) ->
+                    yield! extractFromDecls decls
+                | _ -> () ]
+
+        [ match ast with
+          | ParsedInput.ImplFile(ParsedImplFileInput(_, _, _, _, _, modules, _, _, _)) ->
+              for SynModuleOrNamespace(_, _, _, moduleDecls, _, _, _, _, _) in modules do
+                  yield! extractFromDecls moduleDecls
+          | _ -> () ]
+        |> Map.ofList
+
+    /// Gets the string constants from an attribute, resolving any simple identifier references using
+    /// the provided literal bindings map (as returned by extractLiteralBindings).
+    /// This extends getAttributeConstants to support [&lt;Literal&gt;]-attributed identifiers as attribute arguments.
+    let getAttributeConstantsWithBindings (bindings: Map<string, SynConst>) (attrib: SynAttribute) =
+        let (|StringConst|_|) = function
+            | SynExpr.Const(SynConst.String(text, _, _), _) -> Some text
+            | SynExpr.Ident id ->
+                match bindings.TryFind id.idText with
+                | Some(SynConst.String(text, _, _)) -> Some text
+                | _ -> None
+            | _ -> None
+
+        match attrib.ArgExpr with
+        | SynExpr.Paren(StringConst text, _, _, _) -> [text]
+        | SynExpr.Paren(SynExpr.Tuple(_, entries, _, _), _, _, _) -> entries |> List.choose (|StringConst|_|)
+        | StringConst text -> [text]
+        | _ -> []
+
     let hasAttributeWithConst (attributeType: Type) (attributeArg: string) (attrib: SynAttribute) =
 
         let argumentMatched attributeArg =
@@ -157,22 +212,20 @@ module Ast =
         |> List.collect (fun n -> n.Attributes)
         |> List.tryFind (typeNameMatches typeof<'a>)
 
-    let extractTypeDefn (ast: ParsedInput) =
-        let rec extractTypes (moduleDecls: SynModuleDecl list) (ns: LongIdent) =
-            [   for moduleDecl in moduleDecls do
-                    match moduleDecl with
-                    | SynModuleDecl.Types(types, _) ->
-                        yield (ns, types)
-                    | SynModuleDecl.NestedModule(SynComponentInfo(_, _, _, longId, _, _, _, _), _, decls, _, _, _) ->
-                        let combined = longId |> List.append ns
-                        yield! (extractTypes decls combined)
-                    | other -> ()
-            ]
+    let rec private extractTypesFromDecls (moduleDecls: SynModuleDecl list) (ns: LongIdent) =
+        [ for moduleDecl in moduleDecls do
+              match moduleDecl with
+              | SynModuleDecl.Types (types, _) -> yield (ns, types)
+              | SynModuleDecl.NestedModule (SynComponentInfo (_, _, _, longId, _, _, _, _), _, decls, _, _, _) ->
+                  let combined = longId |> List.append ns
+                  yield! extractTypesFromDecls decls combined
+              | _ -> () ]
 
+    let extractTypeDefn (ast: ParsedInput) =
         [   match ast with
             | ParsedInput.ImplFile(ParsedImplFileInput(_name, _isScript, _qualifiedNameOfFile, _scopedPragmas, _hashDirectives, modules, _g, _, _)) ->
                 for SynModuleOrNamespace(namespaceId, _isRec, _isModule, moduleDecls, _preXmlDoc, _attributes, _access, _, _) as ns in modules do
-                    yield! extractTypes moduleDecls namespaceId
+                    yield! extractTypesFromDecls moduleDecls namespaceId
             | _ -> () ]
 
     let isRecord (SynTypeDefn(_componentInfo, typeDefRepr, _memberDefs,_,_,_)) =
@@ -185,19 +238,14 @@ module Ast =
         | SynTypeDefnRepr.Simple(SynTypeDefnSimpleRepr.Union _, _) -> true
         | _ -> false
 
+    let private filterTypes predicate types =
+        types |> List.map (fun (ns, types) -> ns, types |> List.filter predicate)
+
     let extractRecords (ast: ParsedInput) =
-        let types = extractTypeDefn ast
-        let onlyRecords =
-            types
-            |> List.map (fun (ns, types) -> ns, types |> List.filter isRecord )
-        onlyRecords
+        extractTypeDefn ast |> filterTypes isRecord
 
     let extractDU (ast: ParsedInput) =
-        let types = extractTypeDefn ast
-        let onlyDus =
-            types
-            |> List.map (fun (ns, types) -> ns, types |> List.filter isDu )
-        onlyDus
+        extractTypeDefn ast |> filterTypes isDu
         
         
     module ModuleOrNamespace =
@@ -216,46 +264,19 @@ module Ast =
               | _ -> () ]
             
         let getTypeDefns (nsOrModule: SynModuleOrNamespace) =
-            let rec extractTypes (moduleDecls: SynModuleDecl list) (ns: LongIdent) =
-                [ for moduleDecl in moduleDecls do
-                      match moduleDecl with
-                      | SynModuleDecl.Types (types, _) -> yield (ns, types)
-                      | SynModuleDecl.NestedModule (SynComponentInfo (_attribs, _typeParams, _constraints, longId, _xmlDoc, _preferPostfix, _accessibility, _range), _isRec, decls, _local, _outerRange,_trivia) ->
-                          let combined = longId |> List.append ns
-                          yield! (extractTypes decls combined)
-                      | _other -> () ]
-
             let (SynModuleOrNamespace (namespaceId, _isRec, _isModule, moduleDecls, _preXmlDoc, _attributes, _access, _range, _)) =
                 nsOrModule
 
-            extractTypes moduleDecls namespaceId
+            extractTypesFromDecls moduleDecls namespaceId
         
         let records (nsOrModule: SynModuleOrNamespace) =
-            let types = getTypeDefns nsOrModule
-
-            let onlyRecords =
-                types
-                |> List.map (fun (ns, types) -> ns, types |> List.filter isRecord)
-
-            onlyRecords
+            getTypeDefns nsOrModule |> filterTypes isRecord
 
         let dus (nsOrModule: SynModuleOrNamespace) =
-            let types = getTypeDefns nsOrModule
-
-            let onlyDus =
-                types
-                |> List.map (fun (ns, types) -> ns, types |> List.filter isDu)
-
-            onlyDus
+            getTypeDefns nsOrModule |> filterTypes isDu
         
         let recordsOrDus (nsOrModule: SynModuleOrNamespace) =
-            let types = getTypeDefns nsOrModule
-
-            let recordsOrDus =
-                types
-                |> List.map (fun (ns, types) -> ns, types |> List.filter (fun t -> t |> isDu || t |> isRecord))
-
-            recordsOrDus
+            getTypeDefns nsOrModule |> filterTypes (fun t -> isDu t || isRecord t)
 
     module Ident =
         let asCamelCase (ident: Ident) =

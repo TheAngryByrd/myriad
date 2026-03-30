@@ -4,6 +4,7 @@ framework: net90
 storage: none
 
 nuget Argu
+nuget editorconfig
 nuget Fantomas.Core
 nuget FSharp.Compiler.Service
 nuget FSharp.Core strategy: min

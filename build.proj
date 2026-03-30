@@ -20,10 +20,25 @@
   </Target>
 
   <Target Name="Pack" DependsOnTargets="Clean;Restore;Test">
-    <!-- pack sdk then whole sln -->
-    <Exec Command='dotnet pack src/Myriad.Sdk/Myriad.Sdk.proj -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />
-    <Exec Command='dotnet pack src/Myriad.sln -c Release -o "$(NupkgsDir)" /p:Version=$(Version)' />           
-    <Exec Command='dotnet mergenupkg --source "$(NupkgsDir)/Myriad.Sdk.$(Version).nupkg" --other "$(NupkgsDir)/Myriad.$(Version).nupkg" --tools --only-files' />
+    <PropertyGroup>
+      <!-- Normalize 2-segment versions (e.g., "0.85") to 3-segment (e.g., "0.85.0").
+           NuGet normalizes versions internally when generating nuspec filenames, so
+           passing "0.85" causes Paket to look for "*.0.85.nuspec" while NuGet writes
+           "*.0.85.0.nuspec", resulting in a pack failure. Using 3 segments prevents this.
+           The regex ^\d+\.\d+$ only matches plain X.Y versions; pre-release versions
+           such as "0.85-beta" are intentionally left unchanged. -->
+      <PackVersion Condition=" $([System.Text.RegularExpressions.Regex]::IsMatch('$(Version)', '^\d+\.\d+$')) ">$(Version).0</PackVersion>
+      <PackVersion Condition=" '$(PackVersion)' == '' ">$(Version)</PackVersion>
+    </PropertyGroup>
+    <!-- Create the output directory first so it exists as a local NuGet source -->
+    <MakeDir Directories="$(NupkgsDir)" />
+    <!-- Pack the main sln first so the Myriad tool nupkg is available locally -->
+    <Exec Command='dotnet pack src/Myriad.sln -c Release -o "$(NupkgsDir)" /p:Version=$(PackVersion)' />
+    <!-- Restore Myriad.Sdk pointing at the local nupkg directory so the just-built
+         Myriad package is resolved without requiring it to be published on nuget.org -->
+    <Exec Command='dotnet restore src/Myriad.Sdk/Myriad.Sdk.proj /p:Version=$(PackVersion) --source "$(NupkgsDir)" --source "https://api.nuget.org/v3/index.json"' />
+    <!-- Pack Myriad.Sdk using the restore done above (skip redundant restore) -->
+    <Exec Command='dotnet pack src/Myriad.Sdk/Myriad.Sdk.proj -c Release -o "$(NupkgsDir)" /p:Version=$(PackVersion) --no-restore' />
   </Target>
 
 </Project>

@@ -193,11 +193,14 @@ module AstExtensions =
 
     type SynType with
         static member CreateApp (typ, args, ?isPostfix) =
-            SynType.App(typ, None, args, dotsOrCommas args, None, (defaultArg isPostfix false), range0)
+            SynType.App(typ, Some range0, args, dotsOrCommas args, Some range0, (defaultArg isPostfix false), range0)
         static member CreateLongIdent id =
             SynType.LongIdent(id)
         static member CreateLongIdent s =
             SynType.CreateLongIdent(SynLongIdent.CreateString s)
+        static member CreateFromLongIdent (parent: LongIdent) =
+            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
+            |> SynType.CreateLongIdent
         static member CreateUnit =
             SynType.CreateLongIdent("unit")
         static member CreateFun (fieldTypeIn, fieldTypeOut) =
@@ -411,6 +414,8 @@ module AstExtensions =
             SynModuleDecl.Open(id, range0)
         static member CreateOpen (fullNamespaceOrModuleName: string) =
             SynModuleDecl.Open(SynOpenDeclTarget.ModuleOrNamespace(SynLongIdent.CreateString fullNamespaceOrModuleName, range0), range0)
+        static member CreateOpen (namespaceId: LongIdent) =
+            SynModuleDecl.Open(SynOpenDeclTarget.ModuleOrNamespace(SynLongIdent.CreateFromLongIdent namespaceId, range0), range0)
         static member CreateHashDirective (directive, values) =
             SynModuleDecl.HashDirective (ParsedHashDirective (directive, values, range0), range0)
 

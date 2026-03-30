@@ -3,24 +3,51 @@ name: Publish
 on:
   push:
     tags:
-      - 'v*' # Publish on any new tag matching v*, i.e. v1.0, v1.7.2
+      - 'v*.*.*' # Only publish on 3-segment tags, e.g. v1.0.0, v1.7.2 (not v1.0)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (without v prefix, must be X.Y.Z, e.g. 1.0.0)'
+        required: true
+        type: string
 
 jobs:
   build:
 
     strategy:
       matrix:
-        os: [windows-latest]
+        os: [ubuntu-latest]
         dotnet: ['9.0.x']
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Get version from tag
+    - name: Get version
       id: tag_name
       run: |
-        echo ::set-output name=current_version::${GITHUB_REF#refs/tags/v}
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "current_version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "current_version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        fi
       shell: bash
     - uses: actions/checkout@v4
+    - name: Validate version
+      run: |
+        VERSION="${{ steps.tag_name.outputs.current_version }}"
+        # Require at least three numeric segments (X.Y.Z), optionally followed by a pre-release suffix.
+        # This prevents 2-segment tags like v0.85 (which would publish as 0.85.0 instead of 0.8.5).
+        if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+          echo "::error::Version '$VERSION' does not match the required X.Y.Z format. Did you mean to add a missing segment (e.g. '0.85' should be '0.8.5')?"
+          exit 1
+        fi
+        # Verify the version matches VersionPrefix in Directory.Build.props so that the tag and
+        # source code are always in sync.
+        EXPECTED=$(sed -n 's/.*<VersionPrefix[^>]*>\([^<]*\)<\/VersionPrefix>.*/\1/p' Directory.Build.props | head -1)
+        if [ "$VERSION" != "$EXPECTED" ] && ! echo "$VERSION" | grep -q "^${EXPECTED}-"; then
+          echo "::error::Tag version '$VERSION' does not match VersionPrefix '$EXPECTED' in Directory.Build.props. Update Directory.Build.props before tagging."
+          exit 1
+        fi
+      shell: bash
     - name: Setup dotnet
       uses: actions/setup-dotnet@v4
       with:
@@ -28,32 +55,32 @@ jobs:
         include-prerelease: true
     - name: Restore tools
       run: dotnet tool restore
+    - name: Restore dependencies
+      run: dotnet paket restore
     - name: Run Test
-      run: dotnet build -c Release -t:Test
-    - name: Run build
-      run: dotnet build -c Release -t:Pack
+      run: dotnet build build.proj -c Release -t:Test
+    - name: Run Pack
+      run: dotnet build build.proj -c Release -t:Pack /p:Version=${{ steps.tag_name.outputs.current_version }}
     - name: Get Changelog Entry
       id: changelog_reader
+      if: github.event_name == 'push'
       uses: mindsers/changelog-reader-action@v2
       with:
         version: ${{ steps.tag_name.outputs.current_version }}
         path: ./CHANGELOG.md
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+    - name: Create GitHub Release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref }}
-        release_name: ${{ github.ref }}
+        name: ${{ github.ref_name }}
         body: ${{ steps.changelog_reader.outputs.log_entry }}
         draft: false
         prerelease: false
-    - name: Upload binaries to release
-      uses: svenstaro/upload-release-action@v1-release
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: bin/nupkg/*.nupkg
-        tag: ${{ github.ref }}
-        overwrite: true
-        file_glob: true
+        files: bin/nupkg/*.nupkg
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Push to NuGet
+      run: dotnet nuget push bin/nupkg/*.nupkg --api-key $NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}

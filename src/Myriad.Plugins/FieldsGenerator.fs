@@ -11,17 +11,12 @@ module internal Create =
         let (SynField.SynField(_,_,id,_,_,_,_,_,_)) = field
         let fieldName = match id with None -> failwith "no field name" | Some f -> f
 
-        let recordType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let recordType = SynType.CreateFromLongIdent parent
 
         let varName = "x"
         let pattern =
             let name = SynLongIdent.CreateString fieldName.idText
-            let arg =
-                let named = SynPat.CreateNamed(Ident.Create varName)
-                SynPat.CreateTyped(named, recordType)
-                |> SynPat.CreateParen
+            let arg = GeneratorHelpers.createTypedNamedParen (Ident.Create varName) recordType
 
             SynPat.CreateLongIdent(name, [arg])
 
@@ -39,16 +34,13 @@ module internal Create =
     let createCreate (parent: LongIdent) (fields: SynField list) =
         let varIdent = SynLongIdent.CreateString "create"
 
-        let recordType =
-            SynLongIdent.Create (parent |> List.map (fun i -> i.idText))
-            |> SynType.CreateLongIdent
+        let recordType = SynType.CreateFromLongIdent parent
 
         let pattern =
             let arguments =
                 fields
                 |> List.map (fun (SynField.SynField(_,_,id,typ,_,_,_,_,_)) ->
-                                 let name = SynPat.CreateNamed(Ast.Ident.asCamelCase id.Value)
-                                 SynPat.CreateTyped(name, typ) |> SynPat.CreateParen)
+                                 GeneratorHelpers.createTypedNamedParen (Ast.Ident.asCamelCase id.Value) typ)
 
             SynPat.CreateLongIdent(varIdent, arguments)
 
@@ -80,28 +72,19 @@ module internal Create =
                 |> List.map (fun (SynField.SynField(_,_,id, fieldType,_,_,_,_,_)) ->
                                  let funType = SynType.CreateFun(fieldType, fieldType)
                                  let ident = createFieldMapNameIdent id
-                                 let name = SynPat.CreateNamed(ident)
-                                 SynPat.CreateTyped(name, funType)
-                                 |> SynPat.CreateParen)
+                                 GeneratorHelpers.createTypedNamedParen ident funType)
 
             let recordParam =
-                let name = SynPat.CreateNamed(recordPrimeIdent)
                 let typ =
                     SynLongIdent.Create (recordId |> List.map (fun i -> i.idText))
                     |> SynType.CreateLongIdent
-
-                SynPat.CreateTyped(name, typ)
-                |> SynPat.CreateParen
+                GeneratorHelpers.createTypedNamedParen recordPrimeIdent typ
 
             let allArgs = [yield! arguments; yield recordParam]
 
             SynPat.CreateLongIdent(varIdent, allArgs)
 
         let expr =
-            let copyInfo =
-                let blockSep = (range0, None) : BlockSeparator
-                Some (SynExpr.CreateIdent recordPrimeIdent, blockSep)
-
             let fieldUpdates =
                 let mapField (SynField(_,_,id,_,_,_,_,_,_)) =
                     let lid = SynLongIdent.Create [id.Value.idText]
@@ -122,7 +105,7 @@ module internal Create =
 
                 arguments
 
-            SynExpr.Record(None, copyInfo, fieldUpdates, range0 )
+            SynExpr.Record(None, None, fieldUpdates, range0 )
 
         let returnTypeInfo =
             SynLongIdent.Create (recordId |> List.map (fun i -> i.idText))
@@ -138,9 +121,7 @@ module internal Create =
         match synTypeDefnRepr with
         | SynTypeDefnRepr.Simple(SynTypeDefnSimpleRepr.Record(_accessibility, recordFields, _recordRange), _) ->
 
-            let ident = SynLongIdent.Create (namespaceId |> List.map (fun ident -> ident.idText))
-            let openTarget = SynOpenDeclTarget.ModuleOrNamespace(ident, range0)
-            let openParent = SynModuleDecl.CreateOpen openTarget
+            let openParent = SynModuleDecl.CreateOpen namespaceId
 
             let fieldMaps = recordFields |> List.map (createFieldMap recordId)
 
@@ -156,10 +137,7 @@ module internal Create =
 
             let info = SynComponentInfo.Create recordId
             let mdl = SynModuleDecl.CreateNestedModule(info,  decls)
-            let fieldsNamespace =
-                config
-                |> Seq.tryPick (fun (n,v) -> if n = "namespace" then Some (v :?> string) else None  )
-                |> Option.defaultValue "UnknownNamespace"
+            let fieldsNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
 
             SynModuleOrNamespace.CreateNamespace(Ident.CreateLong fieldsNamespace, isRecursive = true, decls = [mdl])
         | _ -> failwithf "Not a record type"
@@ -171,24 +149,4 @@ type FieldsGenerator() =
         member _.ValidInputExtensions = seq {".fs"}
         member _.Generate(context: GeneratorContext) =
             //_myriadConfigKey is not currently used but could be a failover config section to use when the attribute passes no config section, or used as a root config
-            let ast, _ =
-                Ast.fromFilename context.InputFilename
-                |> Async.RunSynchronously
-                |> Array.head
-
-            let namespaceAndrecords =
-                Ast.extractRecords ast
-                |> List.choose (fun (ns, types) ->
-                    match types |> List.filter Ast.hasAttribute<Generator.FieldsAttribute> with
-                    | [] -> None
-                    | types -> Some (ns, types))
-
-            let modules =
-                namespaceAndrecords
-                |> List.collect (fun (ns, records) ->
-                                    records
-                                    |> List.map (fun record -> let config = Generator.getConfigFromAttribute<Generator.FieldsAttribute> context.ConfigGetter record
-                                                               let recordModule = Create.createRecordModule ns record config
-                                                               recordModule))
-
-            Output.Ast modules
+            GeneratorHelpers.generateModules<Generator.FieldsAttribute> context Ast.extractRecords Create.createRecordModule

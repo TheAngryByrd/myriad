@@ -144,7 +144,6 @@
         <ItemGroup>
             <MyriadSdk_CodeGenInputs Include="@(MyriadCodegen)" />
             <MyriadSdk_CodeGenInputs Include="@(MyriadCodegenHash->'%(FileHash)')" />
-            <MyriadSdk_CodeGenInputs Include="@(MyriadCodegenHash->'%(ModifiedTime)')" />
             <MyriadSdk_CodeGenInputs Include="@(ReferencePath)" />
         </ItemGroup>
 

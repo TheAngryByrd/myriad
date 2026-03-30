@@ -15,9 +15,14 @@ open McMaster.NETCore.Plugins
 module Implementation =
     let findPlugins (path: string) =
         
-        let loader = PluginLoader.CreateFromAssemblyFile(path, sharedTypes = [|typeof<MyriadGeneratorAttribute>; typeof<IMyriadGenerator> |])
+        let loader = PluginLoader.CreateFromAssemblyFile(path, [|typeof<MyriadGeneratorAttribute>; typeof<IMyriadGenerator> |], fun config -> config.PreferSharedTypes <- true)
         let assembly = loader.LoadDefaultAssembly()
-        let types = assembly.GetTypes()
+        let types =
+            try
+                assembly.GetTypes()
+            with
+            | :? Reflection.ReflectionTypeLoadException as ex ->
+                ex.Types |> Array.filter (fun t -> t <> null)
         let gens =
             [ for t in types do
                 if t.GetCustomAttributes(typeof<MyriadGeneratorAttribute>, true).Length > 0
@@ -187,13 +192,13 @@ module Main =
                 |> List.map (runGenerator inputFile)
 
             let formattedCode =
-                let cfg = FormatConfig.Default
-
                 let outputCode =
                     let filename =
                         if inlineGeneration then inputFile
                         else if outputFile.IsSome then outputFile.Value
                         else failwith "Error: No OutputFile was included, and --selfgeneration was not specified."
+
+                    let cfg = Myriad.Core.EditorConfig.readConfiguration filename
 
                     generated
                     |> List.map (fun (genType, output, errors) ->
