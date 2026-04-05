@@ -248,7 +248,7 @@ The nuget package for Myriad can be found here:
 [Nuget package](https://www.nuget.org/packages/myriad/).
 
 ## Dotnet template
-A dotnet template for a Myriad plugin/generator is available on NuGet (note: the template may be outdated relative to the current API):
+A dotnet template for a Myriad plugin/generator is available on NuGet:
 ```
 #install dotnet template
 dotnet new install Myriad.Templates
