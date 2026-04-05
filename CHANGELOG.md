@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.6]
 ### Fixed
-- Build CI workflow now uses `actions/checkout@v4` and `actions/setup-dotnet@v4` (previously v3/v2) and includes an explicit `dotnet paket restore` step.
+- Build CI workflow (`build.yml`) now uses `actions/checkout@v4` and `actions/setup-dotnet@v4` (previously v3/v2) and includes an explicit `dotnet paket restore` step.
 - `Myriad.Sdk` `PackageDownload` is now conditional — skipped when consumers override `MyriadSdk_Generator_Exe`, preventing unnecessary network downloads and offline build failures.
 - Package ID casing normalised to `Myriad` in `Myriad.Sdk.props` (was `myriad`).
 - Publish workflow version validation hardened: regex anchored with `$`, dots escaped in grep, early failure on missing `VersionPrefix`.
