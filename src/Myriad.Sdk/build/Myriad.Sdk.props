@@ -8,9 +8,10 @@
     </PropertyGroup>
 
     <!-- Download the matching Myriad tool package into the NuGet cache so that
-         MyriadSdk_Generator_Exe above resolves to a valid path at build time. -->
-    <ItemGroup>
-        <PackageDownload Include="myriad" Version="[$(_MyriadSdkVersion)]" />
+         MyriadSdk_Generator_Exe above resolves to a valid path at build time.
+         Skipped when the consumer provides a custom MyriadSdk_Generator_Exe. -->
+    <ItemGroup Condition="'$(MyriadSdk_Generator_Exe)' == ''">
+        <PackageDownload Include="Myriad" Version="[$(_MyriadSdkVersion)]" />
     </ItemGroup>
 
 </Project>
