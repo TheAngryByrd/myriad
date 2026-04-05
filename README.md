@@ -21,8 +21,8 @@ If you enjoy this repo and wanted to shown your appriciation etc then I do have 
 To use Myriad via its MSBuild support you add the `Myriad.Core` and `Myriad.Sdk` package references:
 ```xml
     <ItemGroup>
-      <PackageReference Include="Myriad.Core" Version="0.8.4" />
-      <PackageReference Include="Myriad.Sdk" Version="0.8.4" />
+      <PackageReference Include="Myriad.Core" Version="0.8.6" />
+      <PackageReference Include="Myriad.Sdk" Version="0.8.6" />
     </ItemGroup>
 ```
 
@@ -158,8 +158,8 @@ The full fsproj is detail below:
         </Compile>
     </ItemGroup>
     <ItemGroup>
-      <PackageReference Include="Myriad.Core" Version="0.8.4" />
-      <PackageReference Include="Myriad.Sdk" Version="0.8.4" />
+      <PackageReference Include="Myriad.Core" Version="0.8.6" />
+      <PackageReference Include="Myriad.Sdk" Version="0.8.6" />
     </ItemGroup>
 </Project>
 ```
