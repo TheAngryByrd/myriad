@@ -47,7 +47,7 @@ jobs:
           echo "::error::Could not extract VersionPrefix from Directory.Build.props."
           exit 1
         fi
-        EXPECTED_ESCAPED=$(printf '%s' "$EXPECTED" | sed 's/[.]/\\./g')
+        EXPECTED_ESCAPED=$(printf '%s' "$EXPECTED" | sed 's/[.]/[.]/g')
         if [ "$VERSION" != "$EXPECTED" ] && ! echo "$VERSION" | grep -qE "^${EXPECTED_ESCAPED}-"; then
           echo "::error::Tag version '$VERSION' does not match VersionPrefix '$EXPECTED' in Directory.Build.props. Update Directory.Build.props before tagging."
           exit 1
