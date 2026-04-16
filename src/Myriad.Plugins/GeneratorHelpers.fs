@@ -60,3 +60,19 @@ module internal GeneratorHelpers =
                     let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
                     create ns t config))
         Output.Ast modules
+
+    /// Runs the standard generator pipeline for generators that also require the matched SynAttribute
+    /// to construct their output modules. Behaves like <c>generateModules</c> but additionally
+    /// resolves and forwards the matched attribute to the create function.
+    let generateModulesWithAttr<'Attr> (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> SynAttribute -> (string * obj) seq -> SynModuleOrNamespace) : Output =
+        let ast, _ = parseInputAst context
+        let namespacedTypes = extract ast |> filterByAttribute<'Attr>
+        let modules =
+            namespacedTypes
+            |> List.collect (fun (ns, types) ->
+                types |> List.choose (fun t ->
+                    Ast.getAttribute<'Attr> t
+                    |> Option.map (fun attr ->
+                        let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
+                        create ns t attr config)))
+        Output.Ast modules
