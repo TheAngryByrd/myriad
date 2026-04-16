@@ -6,14 +6,19 @@ open Myriad.Core.Ast
 
 module internal GeneratorHelpers =
 
-    /// Builds a qualified SynLongIdent for a DU case identifier, respecting RequireQualifiedAccess.
-    let resolveCaseIdent (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Fantomas.FCS.Syntax.Ident) : SynLongIdent =
+    /// Extracts the Ident from a SynUnionCase.
+    let getCaseIdent (SynUnionCase.SynUnionCase(_, SynIdent(id, _), _, _, _, _, _)) : Ident = id
+
+    /// Resolves the fully-qualified SynLongIdent for a DU case identifier.
+    /// When RequireQualifiedAccess is in effect the parent type name is prepended to the case name.
+    let resolveCaseIdent (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Ident) : SynLongIdent =
         let parts =
             if requiresQualifiedAccess then
                 (parent |> List.map (fun i -> i.idText)) @ [id.idText]
             else
                 [id.idText]
         SynLongIdent.Create parts
+
 
     /// Parses the input file specified in the generator context and returns the first parsed AST.
     let parseInputAst (context: GeneratorContext) =
@@ -29,6 +34,13 @@ module internal GeneratorHelpers =
             match types |> List.filter Ast.hasAttribute<'A> with
             | [] -> None
             | types -> Some (ns, types))
+
+    /// Creates `(name: typ)` — a parenthesised, typed, named pattern.
+    /// Eliminates the repeated `SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed …, …))` idiom.
+    let createTypedNamedParen (name: Ident) (typ: SynType) : SynPat =
+        SynPat.CreateNamed name
+        |> fun p -> SynPat.CreateTyped(p, typ)
+        |> SynPat.CreateParen
 
     /// Runs the standard generator pipeline: parse input AST, extract types, filter by attribute,
     /// and collect modules. Eliminates the boilerplate shared by DUCasesGenerator and FieldsGenerator.

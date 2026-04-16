@@ -15,14 +15,12 @@ module internal CreateDUModule =
         let args = SynPat.CreateTyped(name, duType) |> SynPat.CreateParen
         SynPat.CreateLongIdent(varIdent, [args])
 
-    let resolveCaseIdent = GeneratorHelpers.resolveCaseIdent
-
     let createMatchOnIdent (inputIdent: string) : SynExpr =
         let ident = SynLongIdent.CreateString inputIdent
         SynExpr.CreateLongIdent(false, ident, None)
 
     let createCaseMatchClause (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Ident) (hasFields: bool) (rhs: SynExpr) : SynMatchClause =
-        let indent = resolveCaseIdent requiresQualifiedAccess parent id
+        let indent = GeneratorHelpers.resolveCaseIdent requiresQualifiedAccess parent id
         let args = if hasFields then [SynPat.CreateWild] else []
         let p = SynPat.CreateLongIdent(indent, args)
         SynMatchClause.Create(p, None, rhs)
@@ -40,7 +38,8 @@ module internal CreateDUModule =
         let duType = SynType.CreateFromLongIdent parent
         createDuLetBinding "toString" duType (SynType.String()) (fun () ->
             cases
-            |> List.map (fun (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_) as unionCase) ->
+            |> List.map (fun unionCase ->
+                let id = GeneratorHelpers.getCaseIdent unionCase
                 let rhs = SynExpr.CreateConst(SynConst.CreateString id.idText)
                 createCaseMatchClause requiresQualifiedAccess parent id unionCase.HasFields rhs
             )
@@ -54,12 +53,13 @@ module internal CreateDUModule =
                 cases
                 //Only provide `fromString` for cases with no fields
                 |> List.filter (fun c -> not c.HasFields)
-                |> List.map (fun (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) ->
+                |> List.map (fun unionCase ->
+                    let id = GeneratorHelpers.getCaseIdent unionCase
                     let con = SynConst.CreateString id.idText
                     let pat = SynPat.CreateConst(con)
                     let rhs =
                         let f = SynExpr.Ident (Ident("Some", range0))
-                        let fullCaseName = resolveCaseIdent requiresQualifiedAccess parent id
+                        let fullCaseName = GeneratorHelpers.resolveCaseIdent requiresQualifiedAccess parent id
                         let x = SynExpr.CreateLongIdent fullCaseName
                         SynExpr.App(ExprAtomicFlag.NonAtomic, false, f, x, range0)
                     SynMatchClause.Create(pat, None, rhs)
@@ -75,7 +75,7 @@ module internal CreateDUModule =
         createDuLetBinding "toTag" duType (SynType.Int()) (fun () ->
             cases
             |> List.mapi (fun i case ->
-                let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
+                let id = GeneratorHelpers.getCaseIdent case
                 let rhs = SynExpr.Const(SynConst.Int32 i, range0)
                 createCaseMatchClause requiresQualifiedAccess parent id case.HasFields rhs
             )
@@ -84,7 +84,7 @@ module internal CreateDUModule =
     let createIsCase (requiresQualifiedAccess: bool) (parent: LongIdent) (cases: SynUnionCase list) =
         let duType = SynType.CreateFromLongIdent parent
         [ for case in cases do
-            let (SynUnionCase.SynUnionCase(_,SynIdent(id, _),_,_,_,_,_)) = case
+            let id = GeneratorHelpers.getCaseIdent case
             createDuLetBinding $"is%s{id.idText}" duType (SynType.Bool()) (fun () ->
                 let matchCase =
                     let rhs = SynExpr.CreateConst(SynConst.Bool true)
