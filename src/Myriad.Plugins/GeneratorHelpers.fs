@@ -48,6 +48,12 @@ module internal GeneratorHelpers =
         |> fun p -> SynPat.CreateTyped(p, typ)
         |> SynPat.CreateParen
 
+    /// Reads the "namespace" key from config (defaulting to "UnknownNamespace") and wraps
+    /// the given module declaration in a recursive SynModuleOrNamespace.
+    let createNamespacedModule (config: (string * obj) seq) (mdl: SynModuleDecl) : SynModuleOrNamespace =
+        let ns = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
+        SynModuleOrNamespace.CreateNamespace(Ident.CreateLong ns, isRecursive = true, decls = [mdl])
+
     /// Runs the standard generator pipeline: parse input AST, extract types, filter by attribute,
     /// and collect modules. Eliminates the boilerplate shared by DUCasesGenerator and FieldsGenerator.
     let generateModules<'Attr> (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> (string * obj) seq -> SynModuleOrNamespace) : Output =

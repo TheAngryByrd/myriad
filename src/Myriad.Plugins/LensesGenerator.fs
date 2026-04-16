@@ -175,9 +175,8 @@ type LensesGenerator() =
         member _.Generate(context: GeneratorContext) =
             //context.ConfigKey is not currently used but could be a failover config section to use when the attribute passes no config section, or used as a root config
             let createModule ns typeDefn (attrib: SynAttribute) config =
-                let typeNamespace = GeneratorConfig.getOrDefault "namespace" "UnknownNamespace" config
                 let usePipedSetter = GeneratorConfig.getOrDefault "pipedsetter" false config
                 let synModule = CreateLenses.createLensModule ns typeDefn attrib usePipedSetter
-                SynModuleOrNamespace.CreateNamespace(Ident.CreateLong typeNamespace, isRecursive = true, decls = [synModule])
+                GeneratorHelpers.createNamespacedModule config synModule
             let extract ast = Ast.extractRecords ast @ Ast.extractDU ast
             GeneratorHelpers.generateModulesWithAttr<Generator.LensesAttribute> context extract createModule
