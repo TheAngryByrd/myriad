@@ -6,6 +6,15 @@ open Myriad.Core.Ast
 
 module internal GeneratorHelpers =
 
+    /// Extracts the Ident from a SynUnionCase.
+    let getCaseIdent (SynUnionCase.SynUnionCase(_, SynIdent(id, _), _, _, _, _, _)) : Ident = id
+
+    /// Extracts the field name `Ident` from a `SynField` id option, raising when absent.
+    let getFieldName (id: Ident option) : Ident =
+        match id with
+        | None -> failwith "no field name"
+        | Some f -> f
+
     /// Resolves the fully-qualified SynLongIdent for a DU case identifier.
     /// When RequireQualifiedAccess is in effect the parent type name is prepended to the case name.
     let resolveCaseIdent (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Ident) : SynLongIdent =
@@ -32,6 +41,13 @@ module internal GeneratorHelpers =
             | [] -> None
             | types -> Some (ns, types))
 
+    /// Creates `(name: typ)` — a parenthesised, typed, named pattern.
+    /// Eliminates the repeated `SynPat.CreateParen(SynPat.CreateTyped(SynPat.CreateNamed …, …))` idiom.
+    let createTypedNamedParen (name: Ident) (typ: SynType) : SynPat =
+        SynPat.CreateNamed name
+        |> fun p -> SynPat.CreateTyped(p, typ)
+        |> SynPat.CreateParen
+
     /// Runs the standard generator pipeline: parse input AST, extract types, filter by attribute,
     /// and collect modules. Eliminates the boilerplate shared by DUCasesGenerator and FieldsGenerator.
     let generateModules<'Attr> (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> (string * obj) seq -> SynModuleOrNamespace) : Output =
@@ -43,4 +59,20 @@ module internal GeneratorHelpers =
                 types |> List.map (fun t ->
                     let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
                     create ns t config))
+        Output.Ast modules
+
+    /// Runs the standard generator pipeline for generators that also require the matched SynAttribute
+    /// to construct their output modules. Behaves like <c>generateModules</c> but additionally
+    /// resolves and forwards the matched attribute to the create function.
+    let generateModulesWithAttr<'Attr> (context: GeneratorContext) (extract: ParsedInput -> (LongIdent * SynTypeDefn list) list) (create: LongIdent -> SynTypeDefn -> SynAttribute -> (string * obj) seq -> SynModuleOrNamespace) : Output =
+        let ast, _ = parseInputAst context
+        let namespacedTypes = extract ast |> filterByAttribute<'Attr>
+        let modules =
+            namespacedTypes
+            |> List.collect (fun (ns, types) ->
+                types |> List.choose (fun t ->
+                    Ast.getAttribute<'Attr> t
+                    |> Option.map (fun attr ->
+                        let config = Generator.getConfigFromAttribute<'Attr> context.ConfigGetter t
+                        create ns t attr config)))
         Output.Ast modules
