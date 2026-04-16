@@ -9,6 +9,12 @@ module internal GeneratorHelpers =
     /// Extracts the Ident from a SynUnionCase.
     let getCaseIdent (SynUnionCase.SynUnionCase(_, SynIdent(id, _), _, _, _, _, _)) : Ident = id
 
+    /// Extracts the field name `Ident` from a `SynField` id option, raising when absent.
+    let getFieldName (id: Ident option) : Ident =
+        match id with
+        | None -> failwith "no field name"
+        | Some f -> f
+
     /// Resolves the fully-qualified SynLongIdent for a DU case identifier.
     /// When RequireQualifiedAccess is in effect the parent type name is prepended to the case name.
     let resolveCaseIdent (requiresQualifiedAccess: bool) (parent: LongIdent) (id: Ident) : SynLongIdent =
