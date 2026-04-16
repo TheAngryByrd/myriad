@@ -6,7 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6]
 ### Fixed
+- Build CI workflow (`build.yml`) now uses `actions/checkout@v4` and `actions/setup-dotnet@v4` (previously v3/v2) and includes an explicit `dotnet paket restore` step.
+- `Myriad.Sdk` `PackageDownload` is now conditional — skipped when consumers override `MyriadSdk_Generator_Exe`, preventing unnecessary network downloads and offline build failures.
+- Package ID casing normalised to `Myriad` in `Myriad.Sdk.props` (was `myriad`).
+- Publish workflow version validation hardened: regex anchored with `$`, dots escaped in grep, early failure on missing `VersionPrefix`.
+- Plugin loader now logs `ReflectionTypeLoadException.LoaderExceptions` to stderr in `--verbose` mode.
+- Removed orphaned `Quotations.fs` (dead code referencing non-existent `Microsoft.FSharp.Compiler.*` namespaces).
+- Sample project updated from stale NuGet v0.5.1 references to local `ProjectReference` imports.
 - Publish workflow now supports manual dispatch via `workflow_dispatch` input, uses `$GITHUB_OUTPUT` instead of deprecated `::set-output`, and replaces archived GitHub Actions with `softprops/action-gh-release@v2`. A missing `dotnet paket restore` step was also added before build and test steps. (#234)
 - `Myriad.Sdk.proj` now uses `PackageDownload` instead of `PackageReference` for the `Myriad` tool dependency, resolving **NU1102** and **NU1212** errors that caused every publish attempt to fail since v0.8.4. Consumers of `Myriad.Sdk` also get the matching `Myriad` package placed in the NuGet cache automatically via a `PackageDownload` item in `Myriad.Sdk.props`. (#236)
 - `build.proj` Pack target now normalises 2-segment version numbers (e.g. `0.85`) to 3-segment (`0.85.0`) before passing them to `dotnet pack`/`dotnet restore`, preventing a Paket nuspec filename mismatch that caused pack to fail when using versions like `/p:Version=0.85`. (#238)
