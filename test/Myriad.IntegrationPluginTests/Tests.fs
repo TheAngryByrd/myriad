@@ -93,6 +93,33 @@ let diagnosticsTests =
         }
     ]
 
+let parseAdditionalParamsTests =
+    testList "parseAdditionalParams" [
+        test "empty string yields no params" {
+            let result = Myriad.Implementation.parseAdditionalParams ""
+            Expect.isEmpty result "empty input should produce an empty dictionary"
+        }
+
+        test "single key=value entry is parsed" {
+            let result = Myriad.Implementation.parseAdditionalParams "Namespace=SomeNamespace"
+            Expect.equal result.Count 1 "should have one entry"
+            Expect.equal result.["Namespace"] "SomeNamespace" "value should match"
+        }
+
+        test "pipe-delimited entries (as produced by Myriad.Sdk.targets' Flatten task) are parsed into separate keys" {
+            let result = Myriad.Implementation.parseAdditionalParams "Namespace=SomeNamespace|Module=SomeModuleName"
+            Expect.equal result.Count 2 "should have two entries"
+            Expect.equal result.["Namespace"] "SomeNamespace" "Namespace value should match"
+            Expect.equal result.["Module"] "SomeModuleName" "Module value should match"
+        }
+
+        test "value itself containing '=' is preserved after the first '='" {
+            let result = Myriad.Implementation.parseAdditionalParams "Expr=a=b|Other=c"
+            Expect.equal result.["Expr"] "a=b" "only the first '=' should split the entry"
+            Expect.equal result.["Other"] "c" "second entry should still be parsed"
+        }
+    ]
+
 let literalBindingTests =
     testList "Literal binding tests" [
         test "extractLiteralBindings returns string literal" {
@@ -520,4 +547,6 @@ let tests =
         literalBindingTests
 
         diagnosticsTests
+
+        parseAdditionalParamsTests
     ]
