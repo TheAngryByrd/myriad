@@ -81,19 +81,21 @@ module Implementation =
           InlineGeneration: bool
           GeneratorFilters: string list }
 
-    /// Mirrors Argu's EqualsAssignment behaviour for `--additionalparams key=value`: split once on the
-    /// first '=' into a single (key, value) entry. The MSBuild-side manifest writer flattens a file's
-    /// possibly-multiple <MyriadParams> entries into one 'key=value|key2=value2'-shaped string (see
-    /// Myriad.Sdk.targets), but this matches the CLI's existing single-entry behaviour rather than
-    /// silently changing it - nothing in this repo reads AdditionalParameters today, so there's no
-    /// evidence multi-key was ever meant to work differently, and this isn't the place to guess.
+    /// The MSBuild-side manifest writer flattens a file's possibly-multiple <MyriadParams> entries
+    /// into one 'key=value|key2=value2'-shaped string (see Myriad.Sdk.targets, where ';' is swapped
+    /// for '|' to survive being embedded in an Include attribute). Each '|'-separated entry is then
+    /// split once on its first '=' into a (key, value) pair, mirroring Argu's EqualsAssignment
+    /// behaviour for `--additionalparams key=value` on the single-file CLI path.
     let parseAdditionalParams (flattened: string) : IDictionary<string, string> =
         if String.IsNullOrEmpty flattened then
             dict []
         else
-            match flattened.IndexOf '=' with
-            | -1 -> dict []
-            | idx -> dict [ flattened.Substring(0, idx), flattened.Substring(idx + 1) ]
+            flattened.Split '|'
+            |> Array.choose (fun entry ->
+                match entry.IndexOf '=' with
+                | -1 -> None
+                | idx -> Some(entry.Substring(0, idx), entry.Substring(idx + 1)))
+            |> dict
 
     let parseManifest (path: string) : CodegenUnit list =
         let model = Toml.Parse(File.ReadAllText path, path).ToModel()
