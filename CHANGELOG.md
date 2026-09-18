@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-18
+### Changed
+- Version bumped straight to 1.0.0, superseding 0.9.0 (published minutes earlier, same content). A prior mis-tagged release published as `0.85.0` — parsed as minor version 85, not "0.85" — permanently outranks any `0.9.x` or `0.8.x` release under semver ordering; 1.0.0 is the clean way past that rather than continuing to patch around it. This also marks Myriad's public API as stable going forward: breaking changes now require a major version bump, not another 0.x release.
+
 ## [0.9.0] - 2026-09-18
 ### Added
 - `Myriad`, `Myriad.Core`, and `Myriad.Plugins` now multi-target `net8.0` and `net9.0` (previously `net9.0`-only), so consumers on the .NET 8 SDK can build against them again. `net8.0` is LTS through November 2026; a newer SDK can always consume an older-targeted library, but not the reverse. (#296)
