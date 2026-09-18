@@ -1,14 +1,14 @@
 version 7.1.5
 source https://api.nuget.org/v3/index.json
-framework: net90
+framework: net80, net90
 storage: none
 
-nuget Argu
-nuget editorconfig
-nuget Fantomas.Core
-nuget FSharp.Compiler.Service
-nuget FSharp.Core strategy: min
-nuget Tomlyn
-nuget Expecto
-nuget Aether
-nuget McMaster.NETCore.Plugins
+nuget Argu 6.2.5
+nuget editorconfig 0.15
+nuget Fantomas.Core 7.0.5
+nuget FSharp.Compiler.Service 43.9.101
+nuget FSharp.Core 9.0.101
+nuget Tomlyn 0.18
+nuget Expecto 10.2.3
+nuget Aether 8.3.1
+nuget McMaster.NETCore.Plugins 2.0

@@ -7,7 +7,7 @@
         <!-- Remember whether the consumer supplied a custom exe BEFORE we set the default,
              so that the PackageDownload below can use the same check. -->
         <_MyriadSdkUseDefaultExe Condition="'$(MyriadSdk_Generator_Exe)' == ''">true</_MyriadSdkUseDefaultExe>
-        <MyriadSdk_Generator_Exe Condition="'$(_MyriadSdkUseDefaultExe)' == 'true'">$([System.IO.Path]::Combine('$(NuGetPackageRoot)', 'myriad', '$(_MyriadSdkVersion)', 'tools', 'net9.0', 'any', 'Myriad.dll'))</MyriadSdk_Generator_Exe>
+        <MyriadSdk_Generator_Exe Condition="'$(_MyriadSdkUseDefaultExe)' == 'true'">$([System.IO.Path]::Combine('$(NuGetPackageRoot)', 'myriad', '$(_MyriadSdkVersion)', 'tools', 'net8.0', 'any', 'Myriad.dll'))</MyriadSdk_Generator_Exe>
     </PropertyGroup>
 
     <!-- Download the matching Myriad tool package into the NuGet cache so that

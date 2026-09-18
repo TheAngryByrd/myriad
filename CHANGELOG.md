@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-09-18
+### Added
+- `Myriad`, `Myriad.Core`, and `Myriad.Plugins` now multi-target `net8.0` and `net9.0` (previously `net9.0`-only), so consumers on the .NET 8 SDK can build against them again. `net8.0` is LTS through November 2026; a newer SDK can always consume an older-targeted library, but not the reverse. (#296)
+
 ### Fixed
 - `Myriad.Sdk.targets` `OutputPath` for `MyriadInlineGeneration` files had a stray trailing `)` (left over from a 2022 refactor), which made MSBuild's up-to-date check always fail and forced a full regeneration on every build regardless of whether anything had changed.
 - The `DesignTimeBuild` gate on `MyriadSdkGenerateCode` has been removed for real (previously only proven safe on a scratch copy in `experiments/`) — generated members now appear in a design-time build / IDE reload without a full `dotnet build`, with the existing rebuild cache still correctly no-op'ing unchanged repeats.
